@@ -15,6 +15,8 @@ export type BetSettlement = {
   amount: number;
   wins: WinLine[];
   payout: number;
+  slipId?: string | null;
+  customerName?: string | null;
 };
 
 export type PrizeTypeSummary = {
@@ -135,6 +137,7 @@ function settleBetsCore(
       amount: bet.amount,
       wins,
       payout,
+      slipId: bet.slipId ?? null,
     });
 
     const agg = numberMap.get(bet.number) ?? {
@@ -211,7 +214,12 @@ export function settleDraw(
     profit: core.totalReceived - core.totalPayout,
     totalBets: bets.length,
     winningBets: core.winningBets,
-    lines: core.lines.filter((l) => l.payout > 0),
+    lines: core.lines
+      .filter((l) => l.payout > 0)
+      .map((l) => ({
+        ...l,
+        customerName: l.slipId ? (metaById.get(l.slipId) ?? null) : null,
+      })),
     byNumber: core.byNumber,
     byPrizeType: prizeMapToSortedList(core.prizeMap),
     bySlip,

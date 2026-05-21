@@ -269,6 +269,50 @@ export default function ResultsPage() {
             )}
           </section>
 
+          {s.lines.length > 0 && (
+            <section className={`${ui.tableWrap} mt-4`}>
+              <h2 className="border-b border-slate-200 px-4 py-3 text-sm font-bold dark:border-slate-700">
+                ประวัติคนถูกรางวัล (ตามบิล)
+              </h2>
+              <div className="max-h-[50vh] overflow-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr>
+                      <th className={ui.th}>ลูกค้า</th>
+                      <th className={ui.th}>เลข</th>
+                      <th className={ui.th}>ถูก</th>
+                      <th className={`${ui.th} text-right`}>จ่าย (฿)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {s.lines
+                      .sort((a, b) => b.payout - a.payout)
+                      .map((l, i) => (
+                        <tr key={`${l.betId}-${i}`} className="hover:bg-slate-50 dark:hover:bg-slate-800">
+                          <td className={ui.td}>
+                            {l.customerName ? (
+                              <span className="rounded bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800 dark:bg-amber-900/40 dark:text-amber-300">
+                                {l.customerName}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </td>
+                          <td className={`${ui.td} font-mono font-bold`}>{l.number}</td>
+                          <td className={`${ui.td} text-sm text-slate-500`}>
+                            {l.wins.map((w) => w.label).join(", ")}
+                          </td>
+                          <td className={`${ui.td} text-right font-bold text-red-600 tabular-nums`}>
+                            {l.payout.toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+
           {canManageDraw && (
             <button type="button" onClick={handleNewDraw} className={`${ui.btnGhost} mt-4 w-full`}>
               งวดใหม่
