@@ -12,10 +12,12 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const [sessionHint, setSessionHint] = useState("");
+
   useEffect(() => {
     const reason = new URLSearchParams(window.location.search).get("reason");
     if (reason === "session") {
-      setError("เซสชันหมดอายุหรือไม่ติด — ล็อกอินใหม่");
+      setSessionHint("เซสชันหมดอายุ — ล็อกอินใหม่ด้านล่าง");
     }
   }, []);
 
@@ -26,6 +28,7 @@ export default function LoginPage() {
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: username.trim().toLowerCase(), password }),
       });
@@ -45,12 +48,6 @@ export default function LoginPage() {
               ? "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง"
               : `เข้าสู่ระบบไม่สำเร็จ (${res.status})`),
         );
-        return;
-      }
-
-      const me = await fetch("/api/me");
-      if (!me.ok) {
-        setError("รหัสถูกแล้วแต่ session ไม่ติด — ลอง Safari ปิด Private หรือ Chrome");
         return;
       }
 
@@ -113,6 +110,11 @@ export default function LoginPage() {
               required
             />
           </div>
+          {sessionHint && !error && (
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+              {sessionHint}
+            </p>
+          )}
           {error && (
             <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-950/50 dark:text-red-300">
               {error}
