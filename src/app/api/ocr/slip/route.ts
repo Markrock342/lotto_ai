@@ -18,7 +18,8 @@ export async function POST(request: Request) {
   if (!provider) {
     return NextResponse.json(
       {
-        error: "ยังไม่ได้ตั้ง AI อ่านรูป — ใส่ OPENAI_API_KEY หรือ GEMINI_API_KEY ใน Vercel",
+        error:
+          "ยังไม่ได้ตั้ง AI อ่านรูป — ใส่ OPENROUTER_API_KEY, OPENAI_API_KEY หรือ GEMINI_API_KEY",
         fallback: true,
       },
       { status: 503 },

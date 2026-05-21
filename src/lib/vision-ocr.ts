@@ -14,7 +14,7 @@ Output rules (strict):
 - Include ALL visible numbers even if slightly unclear.
 - Do not invent numbers that are not visible.`;
 
-export type VisionOcrSource = "openai" | "gemini";
+export type VisionOcrSource = "openai" | "gemini" | "openrouter";
 
 function parseVisionResponse(raw: string): string {
   const cleaned = raw
@@ -110,10 +110,78 @@ async function geminiVision(
   return parseVisionResponse(content);
 }
 
-export function visionOcrConfigured(): VisionOcrSource | null {
+async function openRouterVision(
+  base64: string,
+  mime: string,
+): Promise<string> {
+  const key = process.env.OPENROUTER_API_KEY;
+  if (!key) throw new Error("OPENROUTER_API_KEY not set");
+
+  const model =
+    process.env.OPENROUTER_OCR_MODEL ?? "google/gemma-4-31b-it:free";
+  const siteUrl =
+    process.env.OPENROUTER_SITE_URL ??
+    process.env.NEXT_PUBLIC_APP_URL ??
+    "http://localhost:3000";
+
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": siteUrl,
+      "X-Title": "lotto_ai",
+    },
+    body: JSON.stringify({
+      model,
+      temperature: 0,
+      max_tokens: 4096,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: SLIP_VISION_PROMPT },
+            {
+              type: "image_url",
+              image_url: { url: `data:${mime};base64,${base64}` },
+            },
+          ],
+        },
+      ],
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`OpenRouter ${res.status}: ${err.slice(0, 200)}`);
+  }
+
+  const json = (await res.json()) as {
+    choices?: { message?: { content?: string } }[];
+  };
+  const content = json.choices?.[0]?.message?.content ?? "";
+  return parseVisionResponse(content);
+}
+
+function configuredProvider(): VisionOcrSource | null {
+  const prefer = process.env.OCR_VISION_PROVIDER?.trim();
+  if (prefer === "openrouter" && process.env.OPENROUTER_API_KEY?.trim()) {
+    return "openrouter";
+  }
+  if (prefer === "gemini" && process.env.GEMINI_API_KEY?.trim()) {
+    return "gemini";
+  }
+  if (prefer === "openai" && process.env.OPENAI_API_KEY?.trim()) {
+    return "openai";
+  }
+  if (process.env.OPENROUTER_API_KEY?.trim()) return "openrouter";
   if (process.env.OPENAI_API_KEY?.trim()) return "openai";
   if (process.env.GEMINI_API_KEY?.trim()) return "gemini";
   return null;
+}
+
+export function visionOcrConfigured(): VisionOcrSource | null {
+  return configuredProvider();
 }
 
 /** อ่านรูปโพยด้วย Vision AI (แม่นกว่า Tesseract สำหรับลายมือ) */
@@ -132,12 +200,23 @@ export async function recognizeSlipWithVision(
     text: await geminiVision(base64, mime),
     source: "gemini" as const,
   });
+  const tryOpenRouter = async () => ({
+    text: await openRouterVision(base64, mime),
+    source: "openrouter" as const,
+  });
 
+  if (prefer === "openrouter" && process.env.OPENROUTER_API_KEY) {
+    return tryOpenRouter();
+  }
   if (prefer === "gemini" && process.env.GEMINI_API_KEY) {
     return tryGemini();
   }
   if (prefer === "openai" && process.env.OPENAI_API_KEY) {
     return tryOpenAi();
+  }
+
+  if (process.env.OPENROUTER_API_KEY) {
+    return tryOpenRouter();
   }
 
   if (process.env.OPENAI_API_KEY) {
