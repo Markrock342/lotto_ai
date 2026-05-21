@@ -20,7 +20,6 @@ export async function POST(request: Request) {
       {
         error:
           "ยังไม่ได้ตั้ง AI อ่านรูป — ใส่ OPENROUTER_API_KEY, OPENAI_API_KEY หรือ GEMINI_API_KEY",
-        fallback: true,
       },
       { status: 503 },
     );
@@ -54,7 +53,7 @@ export async function POST(request: Request) {
 
     if (lineCount === 0) {
       return NextResponse.json(
-        { error: "AI อ่านรูปไม่พบเลข — ลองถ่ายใหม่หรือวางข้อความจาก LINE", fallback: true },
+        { error: "AI อ่านรูปไม่พบเลข — ลองถ่ายใหม่หรือวางข้อความจาก LINE" },
         { status: 422 },
       );
     }
@@ -69,8 +68,7 @@ export async function POST(request: Request) {
     console.error("vision ocr:", e);
     return NextResponse.json(
       {
-        error: "AI อ่านรูปไม่สำเร็จ — ลองใหม่หรือใช้โหมดอ่านในเครื่อง",
-        fallback: true,
+        error: "AI อ่านรูปไม่สำเร็จ — ลองใหม่อีกครั้ง",
       },
       { status: 500 },
     );

@@ -13,7 +13,9 @@
 ## 1) Supabase (ฐานข้อมูล + backup)
 
 1. สร้างโปรเจกต์ที่ [supabase.com](https://supabase.com)
-2. **Database → Connection string → URI** (Transaction pooler สำหรับ Vercel)
+2. **Database → Connection string → URI**
+   - `DATABASE_URL` = **Transaction Pooler** สำหรับ runtime บน Vercel
+   - `DIRECT_URL` = **Direct connection** สำหรับ `prisma migrate` / seed / tooling
 3. **Storage → New bucket** ชื่อ `backups` (Private)
 4. **Settings → API** คัดลอก `URL` และ `service_role` key (เก็บเป็นความลับ)
 
@@ -34,7 +36,8 @@ Backup อัตโนมัติ:
 
 | ตัวแปร | ค่า |
 |--------|-----|
-| `DATABASE_URL` | Connection string จาก Supabase (pooler) |
+| `DATABASE_URL` | Transaction pooler connection string จาก Supabase |
+| `DIRECT_URL` | Direct connection string สำหรับ migration / seed |
 | `SESSION_SECRET` | สุ่มยาว ≥ 32 ตัว |
 | `CRON_SECRET` | สุ่ม (ให้ตรงกับที่ Vercel Cron ส่ง) |
 | `SUPABASE_URL` | `https://xxx.supabase.co` |
@@ -48,7 +51,8 @@ Backup อัตโนมัติ:
 4. **Migrate + seed ครั้งแรก** (จากเครื่องคุณ):
 
 ```bash
-DATABASE_URL="postgresql://..." npx prisma db seed
+DATABASE_URL="postgresql://..." DIRECT_URL="postgresql://..." npx prisma migrate deploy
+DATABASE_URL="postgresql://..." DIRECT_URL="postgresql://..." npx prisma db seed
 ```
 
 5. เปิด URL ของ Vercel → login `admin` / รหัสที่ตั้งใน `SEED_ADMIN_PASSWORD`
@@ -61,7 +65,7 @@ DATABASE_URL="postgresql://..." npx prisma db seed
 
 ```bash
 cp .env.example .env
-# ใส่ DATABASE_URL จาก Supabase
+# ใส่ DATABASE_URL (pooler) และ DIRECT_URL (direct) จาก Supabase
 
 npm install
 npx prisma migrate deploy

@@ -1,18 +1,11 @@
 import { extractSlipLinesFromOcr } from "@/lib/ocr-slip";
 
-const SLIP_VISION_PROMPT = `Extract every 4-digit lottery number from this image.
+const SLIP_VISION_PROMPT = `You are a high-accuracy OCR assistant. Read and extract all text and numbers from this image exactly as they are written.
 
-Layout hints:
-- Often a notebook with 3 columns of handwritten numbers.
-- Read order: LEFT column top-to-bottom, then MIDDLE column top-to-bottom, then RIGHT column top-to-bottom.
-- LINE chat screenshots: one number per line top-to-bottom.
-
-Output rules (strict):
-- Return ONLY 4-digit numbers, one number per line.
-- No labels, no bullets, no markdown, no explanation.
-- Pad 3-digit numbers with one leading zero (479 → 0479).
-- Include ALL visible numbers even if slightly unclear.
-- Do not invent numbers that are not visible.`;
+Instructions:
+1. If the image is a notebook with columns of handwritten numbers, read column by column: LEFT column top-to-bottom, then MIDDLE column top-to-bottom, then RIGHT column top-to-bottom.
+2. Maintain the format as written (e.g., "23=5", "1234=10", "479 = 2 ชุด").
+3. Do not add any explanations, markdown code blocks, or extra text. Return ONLY the transcribed text.`;
 
 export type VisionOcrSource = "openai" | "gemini" | "openrouter";
 
@@ -114,6 +107,8 @@ function openRouterModels(): string[] {
   const single = process.env.OPENROUTER_OCR_MODEL?.trim();
   if (single) return [single];
   return [
+    "google/gemini-2.5-flash",
+    "meta-llama/llama-3.2-11b-vision-instruct:free",
     "openrouter/free",
     "nvidia/nemotron-nano-12b-v2-vl:free",
     "google/gemma-4-31b-it:free",

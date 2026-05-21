@@ -2,7 +2,6 @@
 
 import { useRef, useState } from "react";
 import { compressImageForOcr } from "@/lib/compress-image";
-import { recognizeSlipImage } from "@/lib/ocr-slip";
 import { ui } from "@/components/ui";
 
 async function recognizeWithAiApi(file: File): Promise<
@@ -18,7 +17,6 @@ async function recognizeWithAiApi(file: File): Promise<
     text?: string;
     message?: string;
     error?: string;
-    fallback?: boolean;
   };
 
   if (res.ok && data.text) {
@@ -27,10 +25,6 @@ async function recognizeWithAiApi(file: File): Promise<
       text: data.text,
       message: data.message ?? "อ่านรูปสำเร็จ",
     };
-  }
-
-  if (data.fallback) {
-    return { ok: false, reason: data.error };
   }
 
   throw new Error(data.error || "อ่านรูปไม่สำเร็จ");
@@ -85,21 +79,7 @@ export function ImageOcrUpload({
         doneMsg = ai.message;
         setProgress(100);
       } else {
-        const hint = ai.reason?.includes("429")
-          ? "AI โควต้าเต็มชั่วคราว"
-          : ai.reason
-            ? "AI อ่านไม่สำเร็จ"
-            : "AI ยังไม่ตั้งค่า";
-        setMsg(`${hint} — อ่านในเครื่องแทน (แม่นน้อย)...`);
-        text = await recognizeSlipImage(file, (pct, st) => {
-          setProgress(pct);
-          setStatus(st);
-        });
-        const lineCount = text.split("\n").filter(Boolean).length;
-        doneMsg =
-          lineCount > 0
-            ? `อ่านได้ ${lineCount} เลข (ในเครื่อง) — ตรวจก่อนบันทึก`
-            : "อ่านรูปแล้ว — ตรวจข้อความก่อนกดบันทึก";
+        throw new Error(ai.reason ?? "AI อ่านไม่สำเร็จ");
       }
 
       if (!text.trim()) {
