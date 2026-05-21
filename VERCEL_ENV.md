@@ -16,6 +16,19 @@
 
 ห้ามรัน `prisma db seed` ซ้ำบน production (ลบข้อมูลเดิมทั้งหมด)
 
+## อ่านรูปโพยด้วย AI (แนะนำ — สมุดลายมือ)
+
+ใส่อย่างใดอย่างหนึ่ง:
+
+| ตัวแปร | ค่า |
+|--------|-----|
+| `OPENAI_API_KEY` | จาก [platform.openai.com](https://platform.openai.com/api-keys) |
+| `GEMINI_API_KEY` | จาก [Google AI Studio](https://aistudio.google.com/apikey) (มี free tier) |
+
+ทางเลือก: `OPENAI_OCR_MODEL` (default `gpt-4o-mini`), `GEMINI_OCR_MODEL`, `OCR_VISION_PROVIDER=openai|gemini`
+
+ค่าใช้จ่ายประมาณ **฿0.1–0.5 ต่อรูป** (OpenAI mini) — ไม่ใส่ key จะ fallback OCR ในเครื่อง (อ่านลายมือได้ไม่ครบ)
+
 ## Backup อัตโนมัติ (แนะนำ)
 
 | ตัวแปร | ค่า |

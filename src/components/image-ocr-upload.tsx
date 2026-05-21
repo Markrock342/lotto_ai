@@ -1,8 +1,34 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { compressImageForOcr } from "@/lib/compress-image";
 import { recognizeSlipImage } from "@/lib/ocr-slip";
 import { ui } from "@/components/ui";
+
+async function recognizeWithAiApi(file: File): Promise<{
+  text: string;
+  message: string;
+} | null> {
+  const compressed = await compressImageForOcr(file);
+  const form = new FormData();
+  form.append("image", compressed);
+
+  const res = await fetch("/api/ocr/slip", { method: "POST", body: form });
+  const data = (await res.json()) as {
+    text?: string;
+    message?: string;
+    error?: string;
+    fallback?: boolean;
+  };
+
+  if (res.ok && data.text) {
+    return { text: data.text, message: data.message ?? "อ่านรูปสำเร็จ" };
+  }
+
+  if (data.fallback) return null;
+
+  throw new Error(data.error || "อ่านรูปไม่สำเร็จ");
+}
 
 export function ImageOcrUpload({
   disabled,
@@ -41,23 +67,40 @@ export function ImageOcrUpload({
     setMsg("กำลังอ่านรูป...");
 
     try {
-      const text = await recognizeSlipImage(file, (pct, st) => {
-        setProgress(pct);
-        setStatus(st);
-      });
+      setMsg("ส่งรูปให้ AI อ่าน...");
+      setProgress(15);
+
+      const ai = await recognizeWithAiApi(file);
+      let text: string;
+      let doneMsg: string;
+
+      if (ai) {
+        text = ai.text;
+        doneMsg = ai.message;
+        setProgress(100);
+      } else {
+        setMsg("AI ยังไม่ตั้งค่า — อ่านในเครื่อง...");
+        text = await recognizeSlipImage(file, (pct, st) => {
+          setProgress(pct);
+          setStatus(st);
+        });
+        const lineCount = text.split("\n").filter(Boolean).length;
+        doneMsg =
+          lineCount > 0
+            ? `อ่านได้ ${lineCount} เลข (ในเครื่อง) — ตรวจก่อนบันทึก`
+            : "อ่านรูปแล้ว — ตรวจข้อความก่อนกดบันทึก";
+      }
+
       if (!text.trim()) {
         setMsg("อ่านรูปไม่พบตัวเลข — ลองรูปชัดขึ้นหรือวางข้อความแทน");
         return;
       }
+
       onText(text);
-      const lineCount = text.split("\n").filter(Boolean).length;
-      setMsg(
-        lineCount > 0
-          ? `อ่านได้ ${lineCount} เลข — ตรวจในช่องข้อความก่อนบันทึก (สมุด 3 คอลัมน์: ถ่ายตรง แสงสว่าง)`
-          : "อ่านรูปแล้ว — ตรวจข้อความก่อนกดบันทึก",
-      );
-    } catch {
-      setMsg("อ่านรูปไม่สำเร็จ — ลองใหม่หรือคัดลอกข้อความจาก LINE");
+      setMsg(doneMsg);
+    } catch (e) {
+      const err = e instanceof Error ? e.message : "อ่านรูปไม่สำเร็จ";
+      setMsg(`${err} — ลองใหม่หรือคัดลอกข้อความจาก LINE`);
     } finally {
       setBusy(false);
       setProgress(0);
@@ -84,7 +127,7 @@ export function ImageOcrUpload({
         onClick={() => inputRef.current?.click()}
         className={ui.btnGhost}
       >
-        {busy ? `อ่านรูป ${progress}%` : "📷 เลือกรูปโพย (แกลเลอรี)"}
+        {busy ? `อ่านรูป ${progress}%` : "📷 เลือกรูปโพย (AI)"}
       </button>
       {status && (
         <span className="text-xs text-slate-500 dark:text-slate-400">{status}</span>
