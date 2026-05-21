@@ -25,6 +25,7 @@ type BetRow = {
   status: string;
   at: string;
   by: string;
+  customerName?: string | null;
 };
 
 export default function ReportsPage() {
@@ -329,6 +330,7 @@ export default function ReportsPage() {
                   <tr>
                     <th className={ui.th}>วันที่</th>
                     <th className={ui.th}>เวลา</th>
+                    <th className={ui.th}>ลูกค้า</th>
                     <th className={ui.th}>เลข</th>
                     <th className={`${ui.th} text-right`}>ยอด</th>
                     <th className={ui.th}>คีย์โดย</th>
@@ -349,6 +351,15 @@ export default function ReportsPage() {
                           hour: "2-digit",
                           minute: "2-digit",
                         })}
+                      </td>
+                      <td className={ui.td}>
+                        {b.customerName ? (
+                          <span className="rounded bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800 dark:bg-amber-900/40 dark:text-amber-300">
+                            {b.customerName}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
                       </td>
                       <td className={`${ui.td} font-mono font-bold`}>{b.number}</td>
                       <td className={`${ui.td} text-right`}>{b.amount.toLocaleString()}</td>
