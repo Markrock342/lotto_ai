@@ -24,7 +24,10 @@ export function ImageOcrUpload({
   }
 
   async function handleFile(file: File) {
-    if (!file.type.startsWith("image/")) {
+    const isImage =
+      file.type.startsWith("image/") ||
+      /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name);
+    if (!isImage) {
       setMsg("เลือกไฟล์รูปภาพเท่านั้น");
       return;
     }
@@ -68,7 +71,6 @@ export function ImageOcrUpload({
         ref={inputRef}
         type="file"
         accept="image/*"
-        capture="environment"
         className="hidden"
         disabled={disabled || busy}
         onChange={(e) => {
@@ -82,7 +84,7 @@ export function ImageOcrUpload({
         onClick={() => inputRef.current?.click()}
         className={ui.btnGhost}
       >
-        {busy ? `อ่านรูป ${progress}%` : "📷 อัปโหลดรูปจาก LINE"}
+        {busy ? `อ่านรูป ${progress}%` : "📷 เลือกรูปโพย (แกลเลอรี)"}
       </button>
       {status && (
         <span className="text-xs text-slate-500 dark:text-slate-400">{status}</span>
