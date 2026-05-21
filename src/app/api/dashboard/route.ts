@@ -18,6 +18,7 @@ export async function GET() {
 
   const house = await getHouseConfig(session.houseId);
   const draw = await getOrCreateOpenDraw(session.houseId);
+  const bets = await prisma.bet.findMany({ where: { drawId: draw.id } });
   const aggregated = await aggregateDraw(draw.id, house.rates);
   const limitsMap = await getLimitsMap(session.houseId);
 
@@ -33,7 +34,7 @@ export async function GET() {
   };
 
   const payoutMap = new Map(
-    aggregated.map((r) => [r.number, r.maxPayout]),
+    aggregated.map((r) => [r.number, r.sets * house.rates.fourStraight]),
   );
   const rows = attachLimits(
     aggregated.map((r) => ({
@@ -44,26 +45,49 @@ export async function GET() {
     })),
     payoutMap,
     limitsConfig,
-  ).map((r) => ({
-    ...r,
-    isCustomCap: Boolean(limitsMap.get(r.number)),
-  }));
+  );
 
-  const totalSets = aggregated.reduce((s, r) => s + r.sets, 0);
   const totalReceived = aggregated.reduce((s, r) => s + r.totalAmount, 0);
-  const totalRisk = aggregated.reduce((s, r) => s + r.maxPayout, 0);
+  const totalRisk = aggregated.reduce(
+    (s, r) => s + r.sets * house.rates.fourStraight,
+    0,
+  );
   const fullCount = rows.filter((r) => r.status === "full").length;
 
+  const recentDraws = await prisma.draw.findMany({
+    where: { houseId: session.houseId, status: "settled" },
+    orderBy: { settledAt: "desc" },
+    take: 5,
+  });
+
+  const top10 = [...aggregated]
+    .sort((a, b) => b.totalAmount - a.totalAmount)
+    .slice(0, 10);
+
   return NextResponse.json({
-    draw: { id: draw.id, label: draw.label, status: draw.status },
     house: { name: house.name, pricePerSet: house.pricePerSet },
-    totals: {
-      totalSets,
+    draw: {
+      id: draw.id,
+      label: draw.label,
+      status: draw.status,
+      result4: draw.result4,
+    },
+    live: {
+      totalBets: bets.length,
       totalReceived,
       totalRisk,
       uniqueNumbers: aggregated.length,
       fullCount,
     },
-    rows,
+    top10,
+    recentDraws: recentDraws.map((d) => ({
+      id: d.id,
+      label: d.label,
+      result4: d.result4,
+      totalReceived: d.totalReceived,
+      totalPayout: d.totalPayout,
+      profit: (d.totalReceived ?? 0) - (d.totalPayout ?? 0),
+      settledAt: d.settledAt,
+    })),
   });
 }

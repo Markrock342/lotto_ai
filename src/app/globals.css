@@ -1,25 +1,104 @@
 @import "tailwindcss";
 
-:root {
-  --background: #020617;
-  --foreground: #f1f5f9;
+/* ── Light (แบบ KD LOT) ── */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+  --bg-page: #f0f4f8;
+  --bg-card: #ffffff;
+  --bg-input: #f8fafc;
+  --bg-nav-active: #2563eb;
+  --bg-header: #1e40af;
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+  --text-on-header: #ffffff;
+  --border: #e2e8f0;
+  --accent: #2563eb;
+  --accent-soft: #dbeafe;
+  --success: #16a34a;
+  --success-soft: #dcfce7;
+  --danger: #dc2626;
+  --danger-soft: #fee2e2;
+  --warn: #d97706;
+  --warn-soft: #fef3c7;
+}
+
+/* ── Dark ── */
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg-page: #020617;
+  --bg-card: rgba(255, 255, 255, 0.05);
+  --bg-input: #020617;
+  --bg-nav-active: #f59e0b;
+  --bg-header: #0f172a;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-on-header: #f1f5f9;
+  --border: rgba(255, 255, 255, 0.1);
+  --accent: #f59e0b;
+  --accent-soft: rgba(245, 158, 11, 0.15);
+  --success: #4ade80;
+  --success-soft: rgba(74, 222, 128, 0.15);
+  --danger: #f87171;
+  --danger-soft: rgba(248, 113, 113, 0.15);
+  --warn: #fbbf24;
+  --warn-soft: rgba(251, 191, 36, 0.15);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--bg-page);
+  --color-foreground: var(--text-primary);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--bg-page);
+  color: var(--text-primary);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
+  transition: background 0.2s, color 0.2s;
 }
 
-input,
-textarea,
-select {
-  color-scheme: dark;
+/* utility classes for themed UI */
+.theme-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+}
+
+.theme-input {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+}
+
+.theme-header {
+  background: var(--bg-header);
+  color: var(--text-on-header);
+  border-bottom: 1px solid var(--border);
+}
+
+.theme-nav-active {
+  background: var(--bg-nav-active);
+  color: #fff;
+}
+
+[data-theme="dark"] .theme-nav-active {
+  color: #0f172a;
+}
+
+.theme-nav-idle {
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.theme-btn-primary {
+  background: linear-gradient(to right, var(--accent), #1d4ed8);
+  color: #fff;
+}
+
+[data-theme="dark"] .theme-btn-primary {
+  background: linear-gradient(to right, #f59e0b, #ea580c);
+  color: #0f172a;
 }

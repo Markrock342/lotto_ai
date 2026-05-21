@@ -35,13 +35,17 @@ model User {
 }
 
 model Draw {
-  id        String   @id @default(cuid())
-  houseId   String
-  house     House    @relation(fields: [houseId], references: [id], onDelete: Cascade)
-  label     String
-  status    String   @default("open")
-  createdAt DateTime @default(now())
-  bets      Bet[]
+  id            String    @id @default(cuid())
+  houseId       String
+  house         House     @relation(fields: [houseId], references: [id], onDelete: Cascade)
+  label         String
+  status        String    @default("open")
+  result4       String?
+  settledAt     DateTime?
+  totalReceived Float?
+  totalPayout   Float?
+  createdAt     DateTime  @default(now())
+  bets          Bet[]
 }
 
 model Bet {

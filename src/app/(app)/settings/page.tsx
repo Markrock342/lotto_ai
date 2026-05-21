@@ -72,8 +72,8 @@ export default function SettingsPage() {
     <>
       <h1 className="text-lg font-bold text-white">ตั้งค่าระบบ</h1>
       <p className="text-xs text-slate-400">
-        เรทจ่าย + เพดานความเสี่ยงทั้งบ้าน
-        {!isAdmin && " (ดูอย่างเดียว — แก้ไขต้องเป็นแอดมิน)"}
+        ปรับเรทจ่ายได้ตลอด + เพดานความเสี่ยง (admin)
+        {!isAdmin && " · ลูกมือดูอย่างเดียว"}
       </p>
 
       <section className="mt-4 space-y-4 rounded-2xl border border-white/10 bg-white/5 p-4">

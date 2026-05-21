@@ -24,6 +24,12 @@ export async function POST(request: Request) {
 
   const house = await getHouseConfig(session.houseId);
   const draw = await getOrCreateOpenDraw(session.houseId);
+  if (draw.status !== "open") {
+    return NextResponse.json(
+      { error: "งวดนี้ปิดแล้ว — กดงวดใหม่ที่หน้าคีย์หวย" },
+      { status: 400 },
+    );
+  }
   const parsed = parseSlipText(body.text, house.pricePerSet);
 
   if (parsed.entries.length === 0) {
