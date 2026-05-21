@@ -25,6 +25,28 @@ export function normalizeOcrText(raw: string): string {
     .join("\n");
 }
 
+function pushFourDigitChunks(digits: string, out: string[]) {
+  if (digits.length < 4) return;
+  if (digits.length % 4 === 0) {
+    for (let i = 0; i < digits.length; i += 4) {
+      out.push(digits.slice(i, i + 4));
+    }
+    return;
+  }
+  const four = digits.match(/\d{4}/g);
+  if (four?.length) out.push(...four);
+}
+
+/** ดึงเลขจากบล็อกตัวเลขยาว (เช่น OCR รวมหลายคอลัมน์เป็นบรรทัดเดียว) */
+function extractFromDigitRuns(raw: string): string[] {
+  const out: string[] = [];
+  for (const line of normalizeOcrText(raw).split("\n")) {
+    const digits = line.replace(/\D/g, "");
+    if (digits.length >= 8) pushFourDigitChunks(digits, out);
+  }
+  return out;
+}
+
 /** ดึงเฉพาะบรรทัดเลขโพย — ตัดขยะจาก UI / อีโมจิ / อักษร */
 export function extractSlipLinesFromOcr(raw: string): string {
   const lines = normalizeOcrText(raw).split("\n");
@@ -47,29 +69,34 @@ export function extractSlipLinesFromOcr(raw: string): string {
       continue;
     }
 
-    // ขยะชัด: ตัวอักษรเยอะ ตัวเลขน้อย
     if (letters.length >= 2 && digits.length < 3) continue;
     if (digits.length === 0) continue;
 
-    // บรรทัดเดียว = เลข 2–4 หลัก (รูปแบบลิสต์ LINE)
-    if (/^[\d\s:.,=\-]*$/.test(trimmed) && digits.length >= 2 && digits.length <= 4) {
-      if (letters.length === 0) {
+    if (/^[\d\s:.,=\-]*$/.test(trimmed) && letters.length === 0) {
+      if (digits.length >= 2 && digits.length <= 4) {
         out.push(digits.padStart(4, "0"));
+        continue;
+      }
+      if (digits.length > 4) {
+        pushFourDigitChunks(digits, out);
         continue;
       }
     }
 
-    // หลายเลข 4 หลักในบรรทัด
     const four = trimmed.match(/\d{4}/g);
     if (four?.length) {
       out.push(...four);
       continue;
     }
 
-    // เลข 3 หลัก — เติม 0 หน้า (เช่น 375 → 0375)
     if (/^\d{3}$/.test(digits) && letters.length === 0) {
       out.push(digits.padStart(4, "0"));
     }
+  }
+
+  const runFallback = extractFromDigitRuns(raw);
+  if (runFallback.length > out.length) {
+    return runFallback.join("\n");
   }
 
   return out.join("\n");
@@ -79,28 +106,17 @@ function countSlipLines(text: string): number {
   return extractSlipLinesFromOcr(text).split("\n").filter(Boolean).length;
 }
 
-/** ตัดขอบ + ขยาย + contrast ก่อน OCR (รูปแชท LINE) */
-export async function preprocessSlipImage(file: File): Promise<Blob> {
-  const bitmap = await createImageBitmap(file);
-  const targetWidth = Math.min(2400, Math.max(1200, Math.round(bitmap.width * 2)));
-  const scale = targetWidth / bitmap.width;
-  const cropX = bitmap.width * 0.02;
-  const cropY = bitmap.height * 0.06;
-  const cropW = bitmap.width * 0.9;
-  const cropH = bitmap.height * 0.86;
+async function blobFromCanvas(canvas: HTMLCanvasElement): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error("canvas blob failed"))),
+      "image/png",
+    );
+  });
+}
 
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(cropW * scale);
-  canvas.height = Math.round(cropH * scale);
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return file;
-
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(bitmap, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+function applyContrast(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  const imageData = ctx.getImageData(0, 0, w, h);
   const d = imageData.data;
   for (let i = 0; i < d.length; i += 4) {
     const gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
@@ -109,18 +125,79 @@ export async function preprocessSlipImage(file: File): Promise<Blob> {
     d[i] = d[i + 1] = d[i + 2] = v;
   }
   ctx.putImageData(imageData, 0, 0);
+}
 
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => (blob ? resolve(blob) : reject(new Error("preprocess failed"))),
-      "image/png",
+/** ตัดขอบ + ขยาย + contrast ก่อน OCR */
+export async function preprocessSlipImage(file: File): Promise<Blob> {
+  const bitmap = await createImageBitmap(file);
+  const targetWidth = Math.min(2400, Math.max(1200, Math.round(bitmap.width * 2)));
+  const scale = targetWidth / bitmap.width;
+  const cropX = bitmap.width * 0.02;
+  const cropY = bitmap.height * 0.03;
+  const cropW = bitmap.width * 0.96;
+  const cropH = bitmap.height * 0.94;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(cropW * scale);
+  canvas.height = Math.round(cropH * scale);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    bitmap.close();
+    return file;
+  }
+
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(bitmap, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  applyContrast(ctx, canvas.width, canvas.height);
+
+  return blobFromCanvas(canvas);
+}
+
+/** แยกรูปเป็นคอลัมน์ (สมุด 3 คอลัมน์) แล้ว OCR ทีละคอลัมน์ */
+async function splitColumnBlobs(image: Blob, columns = 3): Promise<Blob[]> {
+  const bitmap = await createImageBitmap(image);
+  const padX = bitmap.width * 0.03;
+  const usableW = bitmap.width - padX * 2;
+  const colW = usableW / columns;
+  const blobs: Blob[] = [];
+
+  for (let c = 0; c < columns; c++) {
+    const sx = padX + c * colW;
+    const targetWidth = Math.min(1200, Math.max(480, Math.round(colW * 2)));
+    const scale = targetWidth / colW;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(colW * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) continue;
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(
+      bitmap,
+      sx,
+      0,
+      colW,
+      bitmap.height,
+      0,
+      0,
+      canvas.width,
+      canvas.height,
     );
-  });
+    applyContrast(ctx, canvas.width, canvas.height);
+    blobs.push(await blobFromCanvas(canvas));
+  }
+
+  bitmap.close();
+  return blobs;
 }
 
 export type OcrProgress = (percent: number, status: string) => void;
 
-/** อ่านรูปโพย (browser) — เหมาะลิสต์เลขทีละบรรทัดจาก LINE */
+/** อ่านรูปโพย — รองรับลิสต์ LINE แนวตั้ง + สมุดหลายคอลัมน์ */
 export async function recognizeSlipImage(
   file: File,
   onProgress?: OcrProgress,
@@ -135,7 +212,12 @@ export async function recognizeSlipImage(
     image = file;
   }
 
-  const passes: PSM[] = [PSM.SINGLE_BLOCK_VERT_TEXT, PSM.SINGLE_COLUMN];
+  const passes: PSM[] = [
+    PSM.SINGLE_COLUMN,
+    PSM.SINGLE_BLOCK_VERT_TEXT,
+    PSM.SPARSE_TEXT,
+    PSM.AUTO,
+  ];
 
   const worker = await createWorker("eng", 1, {
     logger: (m) => {
@@ -144,7 +226,7 @@ export async function recognizeSlipImage(
       } else if (m.status === "loading language traineddata") {
         onProgress?.(12, "โหลดตัวเลข...");
       } else if (m.status === "recognizing text") {
-        onProgress?.(20 + Math.round(m.progress * 70), "อ่านตัวเลข...");
+        onProgress?.(20 + Math.round(m.progress * 65), "อ่านตัวเลข...");
       }
     },
   });
@@ -152,31 +234,48 @@ export async function recognizeSlipImage(
   let bestRaw = "";
   let bestCount = 0;
 
+  function tryExtract(rawText: string) {
+    const extracted = extractSlipLinesFromOcr(rawText);
+    const count = countSlipLines(extracted);
+    if (count > bestCount) {
+      bestCount = count;
+      bestRaw = extracted;
+    }
+  }
+
   try {
+    await worker.setParameters({
+      tessedit_char_whitelist: "0123456789\n ",
+    });
+
     for (const psm of passes) {
-      await worker.setParameters({
-        tessedit_pageseg_mode: psm,
-        tessedit_char_whitelist: "0123456789\n",
-      });
+      await worker.setParameters({ tessedit_pageseg_mode: psm });
       const { data } = await worker.recognize(image);
-      const extracted = extractSlipLinesFromOcr(data.text);
-      const count = countSlipLines(extracted);
-      if (count > bestCount) {
-        bestCount = count;
-        bestRaw = extracted;
-      }
+      tryExtract(data.text);
     }
 
+    onProgress?.(75, "อ่านทีละคอลัมน์ (สมุด 3 ช่อง)...");
+    const colBlobs = await splitColumnBlobs(image, 3);
+    let colRaw = "";
+    for (let i = 0; i < colBlobs.length; i++) {
+      await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_COLUMN });
+      const { data } = await worker.recognize(colBlobs[i]);
+      colRaw += `${data.text}\n`;
+      onProgress?.(78 + i * 5, `คอลัมน์ ${i + 1}/3...`);
+    }
+    tryExtract(colRaw);
+
     if (bestCount > 0) {
-      onProgress?.(100, "เสร็จ");
+      onProgress?.(100, `อ่านได้ ${bestCount} เลข — ตรวจก่อนบันทึก`);
       return bestRaw;
     }
 
     onProgress?.(90, "ลองอ่านแบบผสมภาษา...");
     await worker.reinitialize("tha+eng", 1);
     const { data } = await worker.recognize(image);
+    const extracted = extractSlipLinesFromOcr(data.text);
     onProgress?.(100, "เสร็จ");
-    return extractSlipLinesFromOcr(data.text);
+    return extracted;
   } finally {
     await worker.terminate();
   }

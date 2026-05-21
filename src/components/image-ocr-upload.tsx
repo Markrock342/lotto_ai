@@ -53,7 +53,7 @@ export function ImageOcrUpload({
       const lineCount = text.split("\n").filter(Boolean).length;
       setMsg(
         lineCount > 0
-          ? `อ่านได้ ${lineCount} บรรทัด — ตรวจเลขก่อนบันทึก (รูปลิสต์แนวตั้งชัดสุด)`
+          ? `อ่านได้ ${lineCount} เลข — ตรวจในช่องข้อความก่อนบันทึก (สมุด 3 คอลัมน์: ถ่ายตรง แสงสว่าง)`
           : "อ่านรูปแล้ว — ตรวจข้อความก่อนกดบันทึก",
       );
     } catch {
