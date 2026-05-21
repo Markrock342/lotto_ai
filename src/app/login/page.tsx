@@ -51,6 +51,8 @@ export default function LoginPage() {
         return;
       }
 
+      setSessionHint("");
+
       router.push("/dashboard");
       router.refresh();
     } catch {

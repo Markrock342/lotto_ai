@@ -8,4 +8,5 @@ export const prisma =
     log: process.env.NODE_ENV === "development" ? ["error"] : [],
   });
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+// บน Vercel ต้อง reuse client — ไม่งั้นกิน Supabase pool (max 15) แล้ว login 500
+globalForPrisma.prisma = prisma;

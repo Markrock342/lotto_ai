@@ -6,7 +6,7 @@
 
 | ตัวแปร | ค่า | หมายเหตุ |
 |--------|-----|----------|
-| `DATABASE_URL` | URI จาก Supabase → **Connect → Session pooler (port 5432)** | โปรเจกต์ใช้ Prisma — **อย่าใช้ Transaction 6543** (ค้าง/ล้ม). แนะนำต่อท้าย `?connection_limit=1` บน Vercel |
+| `DATABASE_URL` | URI จาก Supabase → **Session pooler port 5432** + ต่อท้าย **`?connection_limit=1`** (บังคับบน Vercel) | อย่าใช้ 6543. **ห้าม**เปิด `npm run dev` คู่กับ Vercel ถ้าใช้ DB ตัวเดียวกัน |
 | `SESSION_SECRET` | `openssl rand -hex 32` | คนละค่ากับเครื่อง dev ได้ |
 | `SUPABASE_URL` | `https://yfthcrbsexjnvrrfifkw.supabase.co` | backup cron |
 
