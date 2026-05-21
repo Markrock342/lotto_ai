@@ -11,16 +11,26 @@
 
 ## Env บน Vercel (บังคับ)
 
+รายละเอียดเต็ม: **[VERCEL_ENV.md](./VERCEL_ENV.md)**
+
 ```
-DATABASE_URL=
-SESSION_SECRET=
-SEED_ADMIN_PASSWORD=     # ใช้ตอน seed ครั้งแรกจากเครื่องคุณ
-SEED_STAFF_PASSWORD=
-CRON_SECRET=             # backup cron
+DATABASE_URL=            # Transaction pooler จาก Supabase Connect
+SESSION_SECRET=          # openssl rand -hex 32
 SUPABASE_URL=            # backup upload
+CRON_SECRET=             # backup cron (ถ้าใช้)
 SUPABASE_SERVICE_ROLE_KEY=
 SUPABASE_BACKUP_BUCKET=backups
 ```
+
+ถ้ารัน `supabase/setup.sql` แล้ว → **ไม่ใส่** `SEED_*` บน Vercel
+
+## ยืนยัน SQL / seed
+
+```bash
+./scripts/verify-db.sh
+```
+
+คาดหวัง: House 1 · User 4 · Draw 1
 
 ## หลังส่งงาน (ขายต่อ)
 
