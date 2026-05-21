@@ -69,7 +69,7 @@ async function geminiVision(
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error("GEMINI_API_KEY not set");
 
-  const model = process.env.GEMINI_OCR_MODEL ?? "gemini-2.0-flash";
+  const model = process.env.GEMINI_OCR_MODEL ?? "gemini-2.5-flash";
 
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
