@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "@/components/theme-provider";
-import { ROLE_LABELS } from "@/lib/roles";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -58,19 +57,6 @@ export default function LoginPage() {
           <h1 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">
             เข้าสู่ระบบ
           </h1>
-        </div>
-
-        <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-500/40 dark:bg-amber-950/50 dark:text-amber-100">
-          <p className="font-semibold">1 บัญชีต่อ 1 คน · ไม่แชร์รหัส admin</p>
-          <ul className="mt-2 list-inside list-disc space-y-1 text-xs opacity-90">
-            <li>
-              <strong>{ROLE_LABELS.admin}</strong> — iPad เจ้ามือเท่านั้น (ตั้งค่า · ออกผล)
-            </li>
-            <li>
-              <strong>{ROLE_LABELS.staff}</strong> — แต่ละเครื่องคีย์โพย (staff1, staff2 …)
-            </li>
-            <li>รหัสผ่านคนละชุด — เปลี่ยนได้หลัง login</li>
-          </ul>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
