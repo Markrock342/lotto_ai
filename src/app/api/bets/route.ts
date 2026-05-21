@@ -44,6 +44,7 @@ export async function GET(request: Request) {
     take: 500,
     include: {
       createdBy: { select: { displayName: true, username: true } },
+      slip: { select: { customerName: true } },
     },
   });
 
@@ -55,6 +56,7 @@ export async function GET(request: Request) {
       status: b.status,
       at: b.createdAt,
       by: b.createdBy?.displayName ?? "—",
+      customerName: b.slip?.customerName ?? null,
     })),
   });
 }

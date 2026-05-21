@@ -124,7 +124,17 @@ export default function KeyPage() {
         if (data.blocked) setBlockedList(data.blocked);
         return;
       }
-      setMessage(`บันทึก ${data.added} รายการ` + (data.skipped > 0 ? ` · ข้าม ${data.skipped}` : ""));
+      const slipNote =
+        data.sectionCount > 1
+          ? ` · แยก ${data.sectionCount} บิล`
+          : data.slips?.[0]?.customerName
+            ? ` · ${data.slips[0].customerName}`
+            : "";
+      setMessage(
+        `บันทึก ${data.added} รายการ` +
+          slipNote +
+          (data.skipped > 0 ? ` · ข้าม ${data.skipped}` : ""),
+      );
       if (data.blocked?.length) setBlockedList(data.blocked);
       setRawText("");
       await loadSummary();
@@ -331,12 +341,17 @@ export default function KeyPage() {
           onText={(text) => setRawText((prev) => (prev.trim() ? `${prev}\n${text}` : text))}
           onStatus={setMessage}
         />
+        <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+          แยกบิลตามชื่อ: ใส่บรรทัดหัวข้อ เช่น <span className="font-mono">#สมชาย</span> หรือ{" "}
+          <span className="font-mono">ลูกค้า: น้องหมิว</span> ก่อนเลขแต่ละกลุ่ม
+        </p>
         <textarea
           value={rawText}
           onChange={(e) => setRawText(e.target.value)}
           disabled={drawClosed}
           rows={10}
-          className={`${ui.input} mt-3 min-h-[200px] resize-y font-mono disabled:opacity-50`}
+          placeholder={"#ลูกค้า A\n1234 5678\n\n#ลูกค้า B\n9012=2ชุด"}
+          className={`${ui.input} mt-2 min-h-[200px] resize-y font-mono disabled:opacity-50`}
         />
         <div className="mt-4 flex flex-wrap gap-2">
           <button

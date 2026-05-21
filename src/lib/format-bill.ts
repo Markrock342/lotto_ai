@@ -7,6 +7,7 @@ export type BillRow = {
 export type BillData = {
   houseName: string;
   drawLabel: string;
+  customerName?: string | null;
   pricePerSet: number;
   result4?: string | null;
   rows: BillRow[];
@@ -19,6 +20,7 @@ export function formatBillText(data: BillData): string {
   const lines = [
     data.houseName,
     data.drawLabel,
+    data.customerName ? `ลูกค้า: ${data.customerName}` : "",
     data.result4 ? `ผลออก ${data.result4}` : "",
     `พิมพ์ ${data.printedAt}`,
     "—".repeat(24),

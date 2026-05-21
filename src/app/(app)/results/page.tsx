@@ -145,7 +145,95 @@ export default function ResultsPage() {
             ผลออก {s.result.fourDigit}
           </p>
 
-          <section className={ui.tableWrap}>
+          {s.byPrizeType.length > 0 && (
+            <section className={`${ui.tableWrap} mt-4`}>
+              <h2 className="border-b border-slate-200 px-4 py-3 text-sm font-bold dark:border-slate-700">
+                สรุปแยกประเภทรางวัล
+              </h2>
+              <div className="overflow-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr>
+                      <th className={ui.th}>ประเภท</th>
+                      <th className={`${ui.th} text-right`}>ถูก (ชุด)</th>
+                      <th className={`${ui.th} text-right`}>อัตรา/ชุด</th>
+                      <th className={`${ui.th} text-right`}>จ่ายรวม (฿)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {s.byPrizeType.map((p) => (
+                      <tr key={p.type} className="hover:bg-slate-50 dark:hover:bg-slate-800">
+                        <td className={ui.td}>{p.label}</td>
+                        <td className={`${ui.td} text-right tabular-nums`}>{p.count}</td>
+                        <td className={`${ui.td} text-right tabular-nums text-slate-500`}>
+                          {p.rate.toLocaleString()}
+                        </td>
+                        <td className={`${ui.td} text-right font-bold text-red-600 tabular-nums`}>
+                          {p.payout.toLocaleString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+
+          {s.bySlip.filter((x) => x.customerName || s.bySlip.length > 1).length > 0 && (
+            <section className={`${ui.tableWrap} mt-4`}>
+              <h2 className="border-b border-slate-200 px-4 py-3 text-sm font-bold dark:border-slate-700">
+                สรุปแยกบิล / ลูกค้า
+              </h2>
+              <div className="max-h-[40vh] overflow-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr>
+                      <th className={ui.th}>ลูกค้า</th>
+                      <th className={`${ui.th} text-right`}>รับ</th>
+                      <th className={`${ui.th} text-right`}>จ่าย</th>
+                      <th className={`${ui.th} text-right`}>กำไร</th>
+                      <th className={ui.th}>ถูกรางวัล</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {s.bySlip.map((sl) => (
+                      <tr
+                        key={sl.slipId ?? "_none"}
+                        className="hover:bg-slate-50 dark:hover:bg-slate-800"
+                      >
+                        <td className={`${ui.td} font-medium`}>
+                          {sl.customerName ?? "(ไม่ระบุชื่อ)"}
+                        </td>
+                        <td className={`${ui.td} text-right tabular-nums`}>
+                          {sl.totalReceived.toLocaleString()}
+                        </td>
+                        <td className={`${ui.td} text-right tabular-nums text-red-600`}>
+                          {sl.totalPayout.toLocaleString()}
+                        </td>
+                        <td
+                          className={`${ui.td} text-right tabular-nums font-medium ${
+                            sl.profit >= 0 ? "text-emerald-600" : "text-red-600"
+                          }`}
+                        >
+                          {sl.profit >= 0 ? "+" : ""}
+                          {sl.profit.toLocaleString()}
+                        </td>
+                        <td className={`${ui.td} text-sm text-slate-500`}>
+                          {sl.byPrizeType.length > 0
+                            ? sl.byPrizeType
+                                .map((p) => `${p.label} ${p.count}ชุด`)
+                                .join(" · ")
+                            : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+
+          <section className={`${ui.tableWrap} mt-4`}>
             <h2 className="border-b border-slate-200 px-4 py-3 text-sm font-bold dark:border-slate-700">
               เลขที่ถูกรางวัล
             </h2>

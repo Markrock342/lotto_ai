@@ -6,13 +6,28 @@ import { getHouseConfig } from "@/lib/house-config";
 import { getOrCreateOpenDraw } from "@/lib/house-config";
 import { settleDraw } from "@/lib/settlement";
 
-export async function GET() {
+export async function GET(request: Request) {
   const auth = await requireSession("results:read");
   if (auth.error) return auth.error;
   const session = auth.session;
 
-  const draw = await getDrawForSettlement(session.houseId);
+  const { searchParams } = new URL(request.url);
+  const drawId = searchParams.get("drawId");
+
   const house = await getHouseConfig(session.houseId);
+  let draw;
+
+  if (drawId) {
+    draw = await prisma.draw.findFirst({
+      where: { id: drawId, houseId: session.houseId },
+    });
+  } else {
+    draw = await getDrawForSettlement(session.houseId);
+  }
+
+  if (!draw) {
+    return NextResponse.json({ error: "ไม่พบงวด" }, { status: 404 });
+  }
 
   if (!draw.result4) {
     return NextResponse.json({
@@ -24,7 +39,16 @@ export async function GET() {
   const bets = await prisma.bet.findMany({
     where: { drawId: draw.id, status: "active" },
   });
-  const settlement = settleDraw(bets, { fourDigit: draw.result4 }, house.rates);
+  const slips = await prisma.slip.findMany({
+    where: { drawId: draw.id },
+    select: { id: true, customerName: true },
+  });
+  const settlement = settleDraw(
+    bets,
+    { fourDigit: draw.result4 },
+    house.rates,
+    slips,
+  );
 
   return NextResponse.json({
     draw: {
@@ -70,7 +94,11 @@ export async function POST(request: Request) {
   const bets = await prisma.bet.findMany({
     where: { drawId: draw.id, status: "active" },
   });
-  const settlement = settleDraw(bets, { fourDigit }, house.rates);
+  const slips = await prisma.slip.findMany({
+    where: { drawId: draw.id },
+    select: { id: true, customerName: true },
+  });
+  const settlement = settleDraw(bets, { fourDigit }, house.rates, slips);
 
   await prisma.draw.update({
     where: { id: draw.id },

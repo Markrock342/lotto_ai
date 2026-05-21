@@ -1,4 +1,4 @@
-import type { BetEntry, ParseResult } from "./types";
+import type { BetEntry, ParseResult, SlipSection } from "./types";
 
 const NUMBER_RE = /^\d{2,4}$/;
 const AMOUNT_RE = /^\d+(?:\.\d+)?$/;
@@ -158,7 +158,7 @@ function applyDeclaredSets(
 }
 
 function parseLineFormatBlock(
-  lines: string[],
+  lines: { text: string; lineNo: number }[],
   pricePerSet: number,
 ): BetEntry[] {
   const entries: BetEntry[] = [];
@@ -166,7 +166,8 @@ function parseLineFormatBlock(
   const numberLines: { nums: string[]; lineNo: number }[] = [];
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
+    const line = lines[i].text.trim();
+    const lineNo = lines[i].lineNo;
     if (!line) continue;
 
     const setMatch = line.match(SET_COUNT_RE);
@@ -175,7 +176,7 @@ function parseLineFormatBlock(
       continue;
     }
 
-    const setsLine = parseNumberSetsLine(line, i + 1, pricePerSet);
+    const setsLine = parseNumberSetsLine(line, lineNo, pricePerSet);
     if (setsLine !== null) {
       entries.push(...setsLine);
       continue;
@@ -186,12 +187,12 @@ function parseLineFormatBlock(
     if (isLineOnlyNumbers(line)) {
       numberLines.push({
         nums: extractFourDigitsFromLine(line),
-        lineNo: i + 1,
+        lineNo: lineNo,
       });
       continue;
     }
 
-    const result = parseLine(line, i + 1, pricePerSet);
+    const result = parseLine(line, lineNo, pricePerSet);
     entries.push(...result.entries);
   }
 
@@ -207,35 +208,89 @@ function parseLineFormatBlock(
   return entries;
 }
 
-export function parseSlipText(
-  text: string,
-  pricePerSet = 1,
-): ParseResult {
-  const lines = text.split(/\r?\n/);
-  const lineFormatEntries = parseLineFormatBlock(lines, pricePerSet);
+/** บรรทัดหัวข้อชื่อลูกค้า — ใช้แยกบิล (ไม่รวมบรรทัดเลข/ยอด) */
+export function parseCustomerHeader(line: string): string | null {
+  const t = line.trim();
+  if (!t) return null;
+  if (NUMBER_SETS_LINE_RE.test(t)) return null;
+  if (isLineOnlyNumbers(t)) return null;
 
-  if (lineFormatEntries.length > 0) {
-    const hasClassic = lines.some(
-      (l) =>
-        l.trim() &&
-        !isLineOnlyNumbers(l) &&
-        !NUMBER_SETS_LINE_RE.test(l.trim()) &&
-        !META_LINE_RE.test(l) &&
-        /\d{2,4}\s*[=xX*\/\-]?\s*\d+/.test(l),
-    );
-    if (!hasClassic) {
-      return { entries: lineFormatEntries, errors: [], skippedLines: 0 };
-    }
+  const hash = t.match(/^#{1,3}\s*(.+)$/);
+  if (hash) return hash[1].trim();
+
+  const eq = t.match(/^={2,}\s*(.+?)\s*={2,}$/);
+  if (eq) return eq[1].trim();
+
+  const labeled = t.match(/^(?:ลูกค้า|ชื่อ|บิล|ลูก|คุณ|แม่|พ่อ)\s*[:：]\s*(.+)$/i);
+  if (labeled) return labeled[1].trim();
+
+  const billPrefix = t.match(/^(?:บิล|ลูก|ลูกค้า|คุณ|แม่|พ่อ)\s*(\d+.*)$/i);
+  if (billPrefix) return t;
+
+  if (/\d{2,4}/.test(t)) return null;
+  if (/ชุด|โอน|จ่าย|สต|เพจ|ห้อง|ลาว/i.test(t) && !/น้อง|คุณ|พี่|แม่|พ่อ/i.test(t)) {
+    return null;
   }
 
+  if (t.length <= 48 && /[\u0E00-\u0E7Fa-zA-Z]/.test(t)) return t;
+  return null;
+}
+
+function splitLinesByCustomer(lines: { text: string; lineNo: number }[]): { name: string | null; lines: { text: string; lineNo: number }[] }[] {
+  const out: { name: string | null; lines: { text: string; lineNo: number }[] }[] = [];
+  let name: string | null = null;
+  let buf: { text: string; lineNo: number }[] = [];
+
+  function flush() {
+    if (buf.some((l) => l.text.trim())) out.push({ name, lines: [...buf] });
+    buf = [];
+  }
+
+  for (const line of lines) {
+    const header = parseCustomerHeader(line.text);
+    if (header) {
+      flush();
+      name = header;
+      continue;
+    }
+    buf.push(line);
+  }
+  flush();
+  return out.length > 0 ? out : [{ name: null, lines }];
+}
+
+function buildParseResult(
+  sections: SlipSection[],
+  errors: string[],
+  skippedLines: number,
+): ParseResult {
+  const nonEmpty = sections.filter((s) => s.entries.length > 0);
+  const final =
+    nonEmpty.length > 0 ? nonEmpty : [{ customerName: null, entries: [] as BetEntry[] }];
+  return {
+    entries: final.flatMap((s) => s.entries),
+    sections: final,
+    errors,
+    skippedLines,
+  };
+}
+
+function parseClassicLines(
+  lines: { text: string; lineNo: number }[],
+  pricePerSet: number,
+): {
+  entries: BetEntry[];
+  errors: string[];
+  skippedLines: number;
+} {
   const entries: BetEntry[] = [];
   const errors: string[] = [];
   let skippedLines = 0;
   let declaredSets: number | null = null;
 
   for (let i = 0; i < lines.length; i++) {
-    const lineNo = i + 1;
-    const trimmed = lines[i].trim();
+    const lineNo = lines[i].lineNo;
+    const trimmed = lines[i].text.trim();
     if (!trimmed) continue;
 
     const setMatch = trimmed.match(SET_COUNT_RE);
@@ -262,7 +317,7 @@ export function parseSlipText(
       continue;
     }
 
-    const result = parseLine(lines[i], lineNo, pricePerSet);
+    const result = parseLine(lines[i].text, lineNo, pricePerSet);
 
     if (result.error) {
       errors.push(result.error);
@@ -270,12 +325,64 @@ export function parseSlipText(
       continue;
     }
 
-    if (result.entries.length === 0) {
-      skippedLines += 1;
-    }
-
+    if (result.entries.length === 0) skippedLines += 1;
     entries.push(...result.entries);
   }
 
   return { entries, errors, skippedLines };
+}
+
+export function parseSlipText(
+  text: string,
+  pricePerSet = 1,
+): ParseResult {
+  const rawLines = text.split(/\r?\n/);
+  const lines = rawLines.map((text, i) => ({ text, lineNo: i + 1 }));
+  const lineFormatEntries = parseLineFormatBlock(lines, pricePerSet);
+
+  if (lineFormatEntries.length > 0) {
+    const hasClassic = lines.some(
+      (l) =>
+        l.text.trim() &&
+        !isLineOnlyNumbers(l.text) &&
+        !NUMBER_SETS_LINE_RE.test(l.text.trim()) &&
+        !META_LINE_RE.test(l.text) &&
+        /\d{2,4}\s*[=xX*\/\-]?\s*\d+/.test(l.text),
+    );
+    if (!hasClassic) {
+      const chunks = splitLinesByCustomer(lines);
+      const multi = chunks.filter((c) => c.name).length > 1;
+      const sections: SlipSection[] = multi
+        ? chunks.map((c) => ({
+            customerName: c.name,
+            entries: parseLineFormatBlock(c.lines, pricePerSet),
+          }))
+        : [{ customerName: chunks[0]?.name ?? null, entries: lineFormatEntries }];
+      return buildParseResult(sections, [], 0);
+    }
+  }
+
+  const chunks = splitLinesByCustomer(lines);
+  const multi = chunks.filter((c) => c.name).length > 1;
+  if (multi) {
+    const sections: SlipSection[] = [];
+    const errors: string[] = [];
+    let skippedLines = 0;
+    for (const chunk of chunks) {
+      const part = parseClassicLines(chunk.lines, pricePerSet);
+      errors.push(...part.errors);
+      skippedLines += part.skippedLines;
+      if (part.entries.length > 0) {
+        sections.push({ customerName: chunk.name, entries: part.entries });
+      }
+    }
+    return buildParseResult(sections, errors, skippedLines);
+  }
+
+  const single = parseClassicLines(lines, pricePerSet);
+  return buildParseResult(
+    [{ customerName: chunks[0]?.name ?? null, entries: single.entries }],
+    single.errors,
+    single.skippedLines,
+  );
 }

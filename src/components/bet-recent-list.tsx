@@ -17,6 +17,7 @@ type BetRow = {
   status: string;
   at: string;
   by: string;
+  customerName?: string | null;
 };
 
 type BetSortKey = "at" | "number" | "amount";
@@ -219,6 +220,7 @@ export function BetRecentList({
                 </th>
               )}
               <SortTh label="เวลา" col="at" />
+              <th className={ui.th}>ลูกค้า</th>
               <SortTh label="เลข" col="number" />
               <SortTh label="ยอด" col="amount" align="right" />
               <th className={ui.th} />
@@ -249,6 +251,15 @@ export function BetRecentList({
                       hour: "2-digit",
                       minute: "2-digit",
                     })}
+                  </td>
+                  <td className={ui.td}>
+                    {b.customerName ? (
+                      <span className="rounded bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800 dark:bg-amber-900/40 dark:text-amber-300">
+                        {b.customerName}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
                   </td>
                   <td className={ui.td}>
                     {editingId === b.id ? (

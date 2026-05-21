@@ -25,7 +25,16 @@ export async function GET(
   const bets = await prisma.bet.findMany({
     where: { drawId: draw.id, status: "active" },
   });
-  const settlement = settleDraw(bets, { fourDigit: draw.result4 }, house.rates);
+  const slips = await prisma.slip.findMany({
+    where: { drawId: draw.id },
+    select: { id: true, customerName: true },
+  });
+  const settlement = settleDraw(
+    bets,
+    { fourDigit: draw.result4 },
+    house.rates,
+    slips,
+  );
 
   return NextResponse.json({ draw, settlement });
 }

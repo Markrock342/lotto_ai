@@ -5,6 +5,7 @@ import { PageHeader, StatBox, ui } from "@/components/ui";
 import { PeriodFilter } from "@/components/period-filter";
 import type { ReportPeriod } from "@/lib/date-period";
 import { formatBillText } from "@/lib/format-bill";
+import type { DrawSettlement } from "@/lib/settlement";
 
 type DrawRow = {
   id: string;
@@ -33,6 +34,11 @@ export default function ReportsPage() {
   const [bets, setBets] = useState<BetRow[]>([]);
   const [showCancelled, setShowCancelled] = useState(false);
   const [msg, setMsg] = useState("");
+  const [slips, setSlips] = useState<
+    { id: string; customerName: string | null; betCount: number }[]
+  >([]);
+  const [billSlipId, setBillSlipId] = useState<string | "all">("all");
+  const [settlement, setSettlement] = useState<DrawSettlement | null>(null);
 
   const loadDraws = useCallback(async () => {
     const res = await fetch(`/api/draws?period=${period}`);
@@ -61,8 +67,33 @@ export default function ReportsPage() {
         const { bets: b } = await res.json();
         setBets(b);
       }
+      const slipRes = await fetch(`/api/slips?drawId=${selectedId}`);
+      if (slipRes.ok) {
+        const { slips: s } = await slipRes.json();
+        setSlips(s);
+        setBillSlipId("all");
+      } else {
+        setSlips([]);
+      }
+
+      const drawInfo = draws.find((d) => d.id === selectedId);
+      if (drawInfo && drawInfo.status === "settled") {
+        const resResult = await fetch(`/api/results?drawId=${selectedId}`);
+        if (resResult.ok) {
+          const resultJson = await resResult.json();
+          if (resultJson.hasResult && resultJson.settlement) {
+            setSettlement(resultJson.settlement);
+          } else {
+            setSettlement(null);
+          }
+        } else {
+          setSettlement(null);
+        }
+      } else {
+        setSettlement(null);
+      }
     })();
-  }, [selectedId, period, showCancelled]);
+  }, [selectedId, period, showCancelled, draws]);
 
   const selected = draws.find((d) => d.id === selectedId);
   const settled = draws.filter((d) => d.status === "settled");
@@ -75,12 +106,15 @@ export default function ReportsPage() {
 
   async function handleCopyBill() {
     if (!selectedId) return;
-    const res = await fetch(`/api/reports/bill?drawId=${selectedId}`);
+    const q = new URLSearchParams({ drawId: selectedId });
+    if (billSlipId !== "all") q.set("slipId", billSlipId);
+    const res = await fetch(`/api/reports/bill?${q}`);
     if (!res.ok) return;
     const data = await res.json();
     const text = formatBillText({
       houseName: data.houseName,
       drawLabel: data.draw.label,
+      customerName: data.customerName,
       pricePerSet: data.pricePerSet,
       result4: data.draw.result4,
       rows: data.rows,
@@ -115,6 +149,24 @@ export default function ReportsPage() {
       <PageHeader title="รายงาน" />
 
       <PeriodFilter value={period} onChange={setPeriod} />
+
+      {slips.length > 0 && (
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <span className="text-sm text-slate-600 dark:text-slate-400">บิล:</span>
+          <select
+            value={billSlipId}
+            onChange={(e) => setBillSlipId(e.target.value)}
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800"
+          >
+            <option value="all">รวมทั้งงวด</option>
+            {slips.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.customerName ?? "(ไม่ระบุชื่อ)"} ({s.betCount} รายการ)
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <div className="mt-4 flex flex-wrap gap-2">
         <button type="button" onClick={openPrint} disabled={!selectedId} className={ui.btnPrimary}>
@@ -198,6 +250,60 @@ export default function ReportsPage() {
           </table>
         </div>
       </section>
+
+      {selected && settlement && settlement.bySlip.filter((x) => x.customerName || settlement.bySlip.length > 1).length > 0 && (
+        <section className={`${ui.tableWrap} mt-4`}>
+          <h2 className="border-b border-slate-200 px-4 py-3 text-sm font-bold dark:border-slate-700">
+            สรุปแยกบิล / ลูกค้า
+          </h2>
+          <div className="max-h-[40vh] overflow-auto">
+            <table className="w-full">
+              <thead>
+                <tr>
+                  <th className={ui.th}>ลูกค้า</th>
+                  <th className={`${ui.th} text-right`}>รับ</th>
+                  <th className={`${ui.th} text-right`}>จ่าย</th>
+                  <th className={`${ui.th} text-right`}>กำไร</th>
+                  <th className={ui.th}>ถูกรางวัล</th>
+                </tr>
+              </thead>
+              <tbody>
+                {settlement.bySlip.map((sl) => (
+                  <tr
+                    key={sl.slipId ?? "_none"}
+                    className="hover:bg-slate-50 dark:hover:bg-slate-800"
+                  >
+                    <td className={`${ui.td} font-medium`}>
+                      {sl.customerName ?? "(ไม่ระบุชื่อ)"}
+                    </td>
+                    <td className={`${ui.td} text-right tabular-nums`}>
+                      {sl.totalReceived.toLocaleString()}
+                    </td>
+                    <td className={`${ui.td} text-right tabular-nums text-red-600`}>
+                      {sl.totalPayout.toLocaleString()}
+                    </td>
+                    <td
+                      className={`${ui.td} text-right tabular-nums font-medium ${
+                        sl.profit >= 0 ? "text-emerald-600" : "text-red-600"
+                      }`}
+                    >
+                      {sl.profit >= 0 ? "+" : ""}
+                      {sl.profit.toLocaleString()}
+                    </td>
+                    <td className={`${ui.td} text-sm text-slate-500`}>
+                      {sl.byPrizeType.length > 0
+                        ? sl.byPrizeType
+                            .map((p) => `${p.label} ${p.count}ชุด`)
+                            .join(" · ")
+                        : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       {selected && (
         <section className={`mt-4 ${ui.cardPad}`}>

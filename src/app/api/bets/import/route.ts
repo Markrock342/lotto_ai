@@ -59,14 +59,50 @@ export async function POST(request: Request) {
     );
   }
 
-  await prisma.bet.createMany({
-    data: allowed.map((e) => ({
-      drawId: draw.id,
-      number: e.number,
-      amount: e.amount,
-      createdById: session.userId,
-    })),
-  });
+  const allowedByLine = new Map<number, typeof allowed>();
+  for (const e of allowed) {
+    const list = allowedByLine.get(e.line) ?? [];
+    list.push(e);
+    allowedByLine.set(e.line, list);
+  }
+
+  const sectionAllowed = parsed.sections.map((section) => ({
+    section,
+    entries: section.entries.flatMap((e) => allowedByLine.get(e.line) ?? []),
+  }));
+
+  const toImport =
+    sectionAllowed.filter((s) => s.entries.length > 0).length > 0
+      ? sectionAllowed
+      : [{ section: { customerName: null, entries: allowed }, entries: allowed }];
+
+  let slipOrder = await prisma.slip.count({ where: { drawId: draw.id } });
+  const slipsCreated: { id: string; customerName: string | null; betCount: number }[] = [];
+
+  for (const { section, entries } of toImport) {
+    if (entries.length === 0) continue;
+    const slip = await prisma.slip.create({
+      data: {
+        drawId: draw.id,
+        customerName: section.customerName,
+        sortOrder: slipOrder++,
+      },
+    });
+    await prisma.bet.createMany({
+      data: entries.map((e) => ({
+        drawId: draw.id,
+        slipId: slip.id,
+        number: e.number,
+        amount: e.amount,
+        createdById: session.userId,
+      })),
+    });
+    slipsCreated.push({
+      id: slip.id,
+      customerName: slip.customerName,
+      betCount: entries.length,
+    });
+  }
 
   return NextResponse.json({
     ok: true,
@@ -74,5 +110,7 @@ export async function POST(request: Request) {
     skipped: parsed.entries.length - allowed.length,
     blocked,
     parseErrors: parsed.errors,
+    slips: slipsCreated,
+    sectionCount: slipsCreated.length,
   });
 }

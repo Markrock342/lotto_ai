@@ -10,8 +10,14 @@ export type NumberSummary = {
   totalAmount: number;
 };
 
+export type SlipSection = {
+  customerName: string | null;
+  entries: BetEntry[];
+};
+
 export type ParseResult = {
   entries: BetEntry[];
+  sections: SlipSection[];
   errors: string[];
   skippedLines: number;
 };
