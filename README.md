@@ -1,36 +1,41 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ระบบคีย์หวยลาวชุด
 
-## Getting Started
+เว็บรับแทงหวย 4 ตัว — login หลายผู้ใช้ · ยอดรวมกลาง · จำกัดชุด/ความเสี่ยง · ตั้งเรทจ่าย
 
-First, run the development server:
+## เริ่มใช้งาน
 
 ```bash
+npm install
+npx prisma migrate dev
+npx prisma db seed
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+เปิด http://localhost:3000
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### บัญชีทดลอง
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| ผู้ใช้ | รหัสผ่าน | บทบาท |
+|--------|----------|--------|
+| admin | 1234 | เจ้ามือ |
+| staff1 | 1234 | ลูกมือ |
+| staff2 | 1234 | ลูกมือ |
+| staff3 | 1234 | ลูกมือ |
 
-## Learn More
+## ฟีเจอร์
 
-To learn more about Next.js, take a look at the following resources:
+- วางโพยจาก LINE (เลขทีละบรรทัด + `20 ชุด`)
+- สรุปยอดต่อเลข · ความเสี่ยงจ่าย (4 ตรง)
+- จำกัดชุดต่อเลข (เช่น 2357 ไม่เกิน 10 ชุด) — **เลขเต็มไม่รับเพิ่ม**
+- ตั้งเรทจ่าย 7 แบบ (แอดมิน)
+- ผู้ใช้สูงสุด 5 บัญชี · อัปเดตยอดทุก 4 วินาที
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Deploy
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+ตั้ง `DATABASE_URL` และ `SESSION_SECRET` ใน production แล้วรัน migrate ก่อน start
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npx prisma migrate deploy
+npm run build
+npm start
+```
