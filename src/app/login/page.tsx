@@ -56,7 +56,7 @@ export default function LoginPage() {
       router.push("/dashboard");
       router.refresh();
     } catch {
-      setError("เชื่อมต่อไม่สำเร็จ — เช็กเน็ตหรือ URL");
+      setError("เชื่อมต่อไม่สำเร็จ — เช็กเน็ตหรือลอง /api/health/db");
     } finally {
       setLoading(false);
     }

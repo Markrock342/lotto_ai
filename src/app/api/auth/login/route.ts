@@ -45,16 +45,51 @@ export async function POST(request: Request) {
     });
   } catch (e) {
     console.error("[POST /api/auth/login]", e);
-    const msg = e instanceof Error ? e.message : "";
-    const poolFull =
-      msg.includes("max clients") || msg.includes("EMAXCONNSESSION");
+    const msg = e instanceof Error ? e.message : String(e);
+
+    if (msg.includes("SESSION_SECRET")) {
+      return NextResponse.json(
+        { error: "Vercel ยังไม่มี SESSION_SECRET — คัดลอกจาก .env แล้ว Redeploy" },
+        { status: 503 },
+      );
+    }
+    if (!process.env.DATABASE_URL?.trim()) {
+      return NextResponse.json(
+        { error: "Vercel ยังไม่มี DATABASE_URL — คัดลอกจาก .env แล้ว Redeploy" },
+        { status: 503 },
+      );
+    }
+    if (
+      msg.includes("max clients") ||
+      msg.includes("EMAXCONNSESSION") ||
+      msg.includes("Too many connections")
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "DB เต็ม — ปิด npm run dev บน Mac, รอ 2 นาที, ใส่ ?connection_limit=1 ใน DATABASE_URL",
+        },
+        { status: 503 },
+      );
+    }
+    if (
+      msg.includes("Can't reach database") ||
+      msg.includes("P1001") ||
+      msg.includes("invalid port") ||
+      msg.includes("authentication failed")
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "DATABASE_URL ผิด — ไป Supabase Connect → URI Session pooler :5432 คัดลอกใหม่ + ?connection_limit=1",
+        },
+        { status: 503 },
+      );
+    }
+
     return NextResponse.json(
-      {
-        error: poolFull
-          ? "ฐานข้อมูลเต็มชั่วคราว — ปิด npm run dev บน Mac แล้วรอ 2 นาที"
-          : "เซิร์ฟเวอร์ขัดข้อง — ลองใหม่",
-      },
-      { status: poolFull ? 503 : 500 },
+      { error: "เซิร์ฟเวอร์ขัดข้อง — เปิด /api/health/db ดูรายละเอียด" },
+      { status: 500 },
     );
   }
 }
