@@ -110,57 +110,73 @@ async function geminiVision(
   return parseVisionResponse(content);
 }
 
+function openRouterModels(): string[] {
+  const single = process.env.OPENROUTER_OCR_MODEL?.trim();
+  if (single) return [single];
+  return [
+    "openrouter/free",
+    "nvidia/nemotron-nano-12b-v2-vl:free",
+    "google/gemma-4-31b-it:free",
+  ];
+}
+
 async function openRouterVision(
   base64: string,
   mime: string,
 ): Promise<string> {
-  const key = process.env.OPENROUTER_API_KEY;
+  const key = process.env.OPENROUTER_API_KEY?.trim();
   if (!key) throw new Error("OPENROUTER_API_KEY not set");
 
-  const model =
-    process.env.OPENROUTER_OCR_MODEL ?? "google/gemma-4-31b-it:free";
   const siteUrl =
     process.env.OPENROUTER_SITE_URL ??
     process.env.NEXT_PUBLIC_APP_URL ??
     "http://localhost:3000";
 
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": siteUrl,
-      "X-Title": "lotto_ai",
-    },
-    body: JSON.stringify({
-      model,
-      temperature: 0,
-      max_tokens: 4096,
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "text", text: SLIP_VISION_PROMPT },
-            {
-              type: "image_url",
-              image_url: { url: `data:${mime};base64,${base64}` },
-            },
-          ],
-        },
-      ],
-    }),
-  });
+  let lastErr = "OpenRouter failed";
 
-  if (!res.ok) {
+  for (const model of openRouterModels()) {
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": siteUrl,
+        "X-Title": "lotto_ai",
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0,
+        max_tokens: 4096,
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: SLIP_VISION_PROMPT },
+              {
+                type: "image_url",
+                image_url: { url: `data:${mime};base64,${base64}` },
+              },
+            ],
+          },
+        ],
+      }),
+    });
+
+    if (res.ok) {
+      const json = (await res.json()) as {
+        choices?: { message?: { content?: string } }[];
+      };
+      const content = json.choices?.[0]?.message?.content ?? "";
+      return parseVisionResponse(content);
+    }
+
     const err = await res.text();
-    throw new Error(`OpenRouter ${res.status}: ${err.slice(0, 200)}`);
+    lastErr = `OpenRouter ${res.status} (${model}): ${err.slice(0, 200)}`;
+    if (res.status === 429 || res.status === 503) continue;
+    throw new Error(lastErr);
   }
 
-  const json = (await res.json()) as {
-    choices?: { message?: { content?: string } }[];
-  };
-  const content = json.choices?.[0]?.message?.content ?? "";
-  return parseVisionResponse(content);
+  throw new Error(lastErr);
 }
 
 function configuredProvider(): VisionOcrSource | null {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "@/components/theme-provider";
 
@@ -12,6 +12,13 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    const reason = new URLSearchParams(window.location.search).get("reason");
+    if (reason === "session") {
+      setError("เซสชันหมดอายุหรือไม่ติด — ล็อกอินใหม่");
+    }
+  }, []);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -22,15 +29,35 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: username.trim().toLowerCase(), password }),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "เข้าสู่ระบบไม่สำเร็จ");
+
+      let data: { error?: string } = {};
+      try {
+        data = (await res.json()) as { error?: string };
+      } catch {
+        setError(`เซิร์ฟเวอร์ตอบผิดรูปแบบ (${res.status}) — ลองใหม่`);
         return;
       }
+
+      if (!res.ok) {
+        setError(
+          data.error ||
+            (res.status === 401
+              ? "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง"
+              : `เข้าสู่ระบบไม่สำเร็จ (${res.status})`),
+        );
+        return;
+      }
+
+      const me = await fetch("/api/me");
+      if (!me.ok) {
+        setError("รหัสถูกแล้วแต่ session ไม่ติด — ลอง Safari ปิด Private หรือ Chrome");
+        return;
+      }
+
       router.push("/dashboard");
       router.refresh();
     } catch {
-      setError("เชื่อมต่อไม่สำเร็จ");
+      setError("เชื่อมต่อไม่สำเร็จ — เช็กเน็ตหรือ URL");
     } finally {
       setLoading(false);
     }

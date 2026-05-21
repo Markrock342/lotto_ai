@@ -5,10 +5,10 @@ import { compressImageForOcr } from "@/lib/compress-image";
 import { recognizeSlipImage } from "@/lib/ocr-slip";
 import { ui } from "@/components/ui";
 
-async function recognizeWithAiApi(file: File): Promise<{
-  text: string;
-  message: string;
-} | null> {
+async function recognizeWithAiApi(file: File): Promise<
+  | { ok: true; text: string; message: string }
+  | { ok: false; reason?: string }
+> {
   const compressed = await compressImageForOcr(file);
   const form = new FormData();
   form.append("image", compressed);
@@ -22,10 +22,16 @@ async function recognizeWithAiApi(file: File): Promise<{
   };
 
   if (res.ok && data.text) {
-    return { text: data.text, message: data.message ?? "อ่านรูปสำเร็จ" };
+    return {
+      ok: true,
+      text: data.text,
+      message: data.message ?? "อ่านรูปสำเร็จ",
+    };
   }
 
-  if (data.fallback) return null;
+  if (data.fallback) {
+    return { ok: false, reason: data.error };
+  }
 
   throw new Error(data.error || "อ่านรูปไม่สำเร็จ");
 }
@@ -74,12 +80,17 @@ export function ImageOcrUpload({
       let text: string;
       let doneMsg: string;
 
-      if (ai) {
+      if (ai.ok) {
         text = ai.text;
         doneMsg = ai.message;
         setProgress(100);
       } else {
-        setMsg("AI ยังไม่ตั้งค่า — อ่านในเครื่อง...");
+        const hint = ai.reason?.includes("429")
+          ? "AI โควต้าเต็มชั่วคราว"
+          : ai.reason
+            ? "AI อ่านไม่สำเร็จ"
+            : "AI ยังไม่ตั้งค่า";
+        setMsg(`${hint} — อ่านในเครื่องแทน (แม่นน้อย)...`);
         text = await recognizeSlipImage(file, (pct, st) => {
           setProgress(pct);
           setStatus(st);
