@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { requireSession } from "@/lib/permissions";
 
 export async function GET() {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireSession("limits:read");
+  if (auth.error) return auth.error;
+  const session = auth.session;
   const rows = await prisma.numberLimit.findMany({
     where: { houseId: session.houseId },
     orderBy: { number: "asc" },
@@ -15,10 +14,9 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireSession("limits:write");
+  if (auth.error) return auth.error;
+  const session = auth.session;
 
   const body = (await request.json()) as {
     number?: string;
@@ -51,10 +49,9 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireSession("limits:write");
+  if (auth.error) return auth.error;
+  const session = auth.session;
 
   const { searchParams } = new URL(request.url);
   const number = searchParams.get("number")?.padStart(4, "0");

@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { prisma } from "./db";
+import { validatePassword } from "./password";
 
 const COOKIE = "lotto_session";
 
@@ -26,6 +27,7 @@ export async function createSession(user: {
   username: string;
   displayName: string;
   role: string;
+  tokenVersion: number;
 }) {
   const token = await new SignJWT({
     userId: user.id,
@@ -33,6 +35,7 @@ export async function createSession(user: {
     username: user.username,
     displayName: user.displayName,
     role: user.role,
+    tokenVersion: user.tokenVersion,
   })
     .setProtectedHeader({ alg: "HS256" })
     .setExpirationTime("7d")
@@ -60,21 +63,76 @@ export async function getSession(): Promise<SessionUser | null> {
 
   try {
     const { payload } = await jwtVerify(token, secret());
-    const house = await prisma.house.findUnique({
-      where: { id: payload.houseId as string },
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId as string },
+      include: { house: true },
     });
-    if (!house) return null;
+    if (!user) return null;
+    const tokenVersion = payload.tokenVersion as number | undefined;
+    if (tokenVersion !== user.tokenVersion) return null;
     return {
       userId: payload.userId as string,
       houseId: payload.houseId as string,
       username: payload.username as string,
       displayName: payload.displayName as string,
       role: payload.role as string,
-      houseName: house.name,
+      houseName: user.house.name,
     };
   } catch {
     return null;
   }
+}
+
+export async function changePassword(
+  userId: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const pwErr = validatePassword(newPassword);
+  if (pwErr) return { ok: false, error: pwErr };
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) return { ok: false, error: "ไม่พบผู้ใช้" };
+
+  const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!valid) return { ok: false, error: "รหัสผ่านปัจจุบันไม่ถูกต้อง" };
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      passwordHash: await hashPassword(newPassword),
+      tokenVersion: { increment: 1 },
+      passwordChangedAt: new Date(),
+    },
+  });
+
+  return { ok: true };
+}
+
+/** เจ้ามือรีเซ็ตรหัสลูกมือ — บังคับ logout ทุกเครื่องของเป้าหมาย */
+export async function adminResetPassword(
+  targetUserId: string,
+  houseId: string,
+  newPassword: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const pwErr = validatePassword(newPassword);
+  if (pwErr) return { ok: false, error: pwErr };
+
+  const user = await prisma.user.findUnique({ where: { id: targetUserId } });
+  if (!user || user.houseId !== houseId) {
+    return { ok: false, error: "ไม่พบผู้ใช้ในบ้านนี้" };
+  }
+
+  await prisma.user.update({
+    where: { id: targetUserId },
+    data: {
+      passwordHash: await hashPassword(newPassword),
+      tokenVersion: { increment: 1 },
+      passwordChangedAt: new Date(),
+    },
+  });
+
+  return { ok: true };
 }
 
 export async function verifyLogin(username: string, password: string) {

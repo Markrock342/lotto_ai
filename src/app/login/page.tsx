@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "@/components/theme-provider";
+import { ROLE_LABELS } from "@/lib/roles";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -20,7 +21,7 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username: username.trim().toLowerCase(), password }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -37,81 +38,84 @@ export default function LoginPage() {
   }
 
   return (
-    <div
-      className="flex min-h-full flex-col items-center justify-center px-4"
-      style={{ background: "var(--bg-page)" }}
-    >
+    <div className="relative flex min-h-screen flex-col items-center justify-center bg-slate-100 px-4 dark:bg-slate-950">
       <button
         type="button"
         onClick={toggle}
-        className="absolute right-4 top-4 rounded-lg theme-card px-3 py-1.5 text-xs"
-        style={{ color: "var(--text-secondary)" }}
+        className="absolute right-4 top-4 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
       >
         {theme === "light" ? "🌙 โหมดมืด" : "☀️ โหมดสว่าง"}
       </button>
 
-      <div className="theme-card w-full max-w-sm p-8 shadow-xl">
-        <p
-          className="text-center text-xs font-semibold uppercase tracking-widest"
-          style={{ color: "var(--accent)" }}
-        >
-          🇱🇦 หวยลาวชุด · เจ้ามือ
-        </p>
-        <h1
-          className="mt-2 text-center text-2xl font-bold"
-          style={{ color: "var(--text-primary)" }}
-        >
-          เข้าสู่ระบบ
-        </h1>
-        <p className="mt-1 text-center text-xs" style={{ color: "var(--text-secondary)" }}>
-          เจ้ามือ/ลูกมือ · iPad & คอม 3–4 เครื่อง · โพยวางจาก LINE
-        </p>
+      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+        <div className="mb-6 text-center">
+          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-2xl text-white shadow-lg">
+            🇱🇦
+          </div>
+          <p className="text-xs font-semibold uppercase tracking-widest text-blue-600 dark:text-amber-400">
+            หวยลาวชุด
+          </p>
+          <h1 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">
+            เข้าสู่ระบบ
+          </h1>
+        </div>
 
-        <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+        <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-500/40 dark:bg-amber-950/50 dark:text-amber-100">
+          <p className="font-semibold">1 บัญชีต่อ 1 คน · ไม่แชร์รหัส admin</p>
+          <ul className="mt-2 list-inside list-disc space-y-1 text-xs opacity-90">
+            <li>
+              <strong>{ROLE_LABELS.admin}</strong> — iPad เจ้ามือเท่านั้น (ตั้งค่า · ออกผล)
+            </li>
+            <li>
+              <strong>{ROLE_LABELS.staff}</strong> — แต่ละเครื่องคีย์โพย (staff1, staff2 …)
+            </li>
+            <li>รหัสผ่านคนละชุด — เปลี่ยนได้หลัง login</li>
+          </ul>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="text-xs" style={{ color: "var(--text-secondary)" }}>
+            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
               ชื่อผู้ใช้
             </label>
             <input
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="theme-input mt-1 w-full rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500/40"
+              className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 text-base text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
               autoComplete="username"
+              placeholder="admin หรือ staff1"
               required
             />
           </div>
           <div>
-            <label className="text-xs" style={{ color: "var(--text-secondary)" }}>
+            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
               รหัสผ่าน
             </label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="theme-input mt-1 w-full rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500/40"
+              className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 text-base text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
               autoComplete="current-password"
               required
             />
           </div>
           {error && (
-            <p
-              className="rounded-lg px-3 py-2 text-xs"
-              style={{ background: "var(--danger-soft)", color: "var(--danger)" }}
-            >
+            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-950/50 dark:text-red-300">
               {error}
             </p>
           )}
           <button
             type="submit"
             disabled={loading}
-            className="theme-btn-primary w-full rounded-xl py-3 text-sm font-bold disabled:opacity-60"
+            className="w-full rounded-xl bg-blue-600 py-3.5 text-base font-bold text-white shadow-md transition hover:bg-blue-700 disabled:opacity-60 dark:bg-amber-500 dark:text-slate-900 dark:hover:bg-amber-400"
           >
             {loading ? "กำลังเข้า..." : "เข้าสู่ระบบ"}
           </button>
         </form>
 
-        <p className="mt-6 text-center text-[10px]" style={{ color: "var(--text-secondary)" }}>
-          ทดลอง: admin / 1234
+        <p className="mt-5 text-center text-xs text-slate-400">
+          ลืมรหัส — ติดต่อเจ้ามือรีเซ็ตที่เมนู「ผู้ใช้」
         </p>
       </div>
     </div>

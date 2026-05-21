@@ -1,21 +1,20 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { requireSession } from "@/lib/permissions";
 import { prisma } from "@/lib/db";
+import { getActiveOpenDraw } from "@/lib/draw-context";
 import {
   aggregateDraw,
   getHouseConfig,
   getLimitsMap,
-  getOrCreateOpenDraw,
   getCapForNumber,
 } from "@/lib/house-config";
 import { parseSlipText } from "@/lib/parse-slip";
 import { checkAddBets } from "@/lib/validate-bets";
 
 export async function POST(request: Request) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireSession("bets:write");
+  if (auth.error) return auth.error;
+  const session = auth.session;
 
   const body = (await request.json()) as { text?: string };
   if (!body.text?.trim()) {
@@ -23,10 +22,10 @@ export async function POST(request: Request) {
   }
 
   const house = await getHouseConfig(session.houseId);
-  const draw = await getOrCreateOpenDraw(session.houseId);
-  if (draw.status !== "open") {
+  const draw = await getActiveOpenDraw(session.houseId);
+  if (!draw || draw.status !== "open") {
     return NextResponse.json(
-      { error: "งวดนี้ปิดแล้ว — กดงวดใหม่ที่หน้าคีย์หวย" },
+      { error: "งวดนี้ปิดรับแล้ว" },
       { status: 400 },
     );
   }

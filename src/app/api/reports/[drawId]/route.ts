@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { requireSession } from "@/lib/permissions";
 import { prisma } from "@/lib/db";
 import { getHouseConfig } from "@/lib/house-config";
 import { settleDraw } from "@/lib/settlement";
@@ -8,10 +8,9 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ drawId: string }> },
 ) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireSession("reports:read");
+  if (auth.error) return auth.error;
+  const session = auth.session;
 
   const { drawId } = await params;
   const draw = await prisma.draw.findFirst({
@@ -23,7 +22,9 @@ export async function GET(
   }
 
   const house = await getHouseConfig(session.houseId);
-  const bets = await prisma.bet.findMany({ where: { drawId: draw.id } });
+  const bets = await prisma.bet.findMany({
+    where: { drawId: draw.id, status: "active" },
+  });
   const settlement = settleDraw(bets, { fourDigit: draw.result4 }, house.rates);
 
   return NextResponse.json({ draw, settlement });

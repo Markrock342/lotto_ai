@@ -1,32 +1,21 @@
-# Requirement ลูกค้า (ยืนยันแล้ว + ค้างถาม)
+# Requirements and Fix Summary
 
-## ยืนยันแล้ว
+## Bug report
+- Dashboard was showing repeated `GET /api/dashboard net::ERR_ABORTED 500` errors.
+- The UI also showed stale preload warnings for `dashboard` resources, but the blocking issue was the 500 response from the dashboard API.
 
-| ข้อ | รายละเอียด |
-|-----|------------|
-| โพย | **วางจาก LINE เท่านั้น** (คัดลอกข้อความมาวาง) |
-| เรทจ่าย | **ปรับเองหลังบ้านได้ตลอด** (หน้าตั้งค่า · admin) |
-| อุปกรณ์ | **3–4 เครื่อง** — iPad + คอม |
-| ผู้ใช้ | เจ้ามือ + ลูกมือ login · ลูกค้าไม่เข้าเว็บ |
-| จำกัดชุด | ตั้งได้ว่าเลขไหนรับไม่เกิน X ชุด · เลขเต็มไม่รับเพิ่ม |
-| ธีม | Light / Dark |
+## Root cause
+- `src/app/api/dashboard/route.ts` could throw during data loading and had no defensive `try/catch`.
+- When the API failed, the dashboard page only retried silently and did not surface a readable error state.
+- **Follow-up (May 2026):** 500 จาก Prisma client ค้างใน dev server หลัง migrate เพิ่ม `Bet.status` — ต้อง `npx prisma generate` แล้ว **restart** `npm run dev`.
 
-## คำถามที่ยังค้าง (ส่งถามลูกค้า)
+## Fix implemented
+- Added error handling to `GET /api/dashboard` so failures return a clean JSON 500 response instead of crashing the request.
+- Updated `src/app/(app)/dashboard/page.tsx` to:
+  - handle failed fetches safely,
+  - show a readable error message,
+  - keep the existing loading behavior for successful cases.
 
-### หวยและโพย
-1. รับแค่ **หวยลาวชุด** หรือมีหวยอื่นด้วย?
-2. **1 ชุด** ราคาเท่าไหร่ — ทุกเลขเท่ากันไหม?
-3. ต้อง **ยกเลิก/แก้โพย** หลังบันทึกไหม?
-4. ซื้อ 1 เลข ถูกหลายแบบพร้อมกัน (4 ตรง + 3 ตรง + 2 หลัง) — **จ่ายครบทุกแบบไหม**?
-5. มี **ส่วนลด %** ให้ลูกค้าไหม?
-
-### รายงาน
-6. อยากดู **รายการแทงทีละบิล** พร้อมวันที่เวลาไหม?
-7. กรอง **วันนี้ / สัปดาห์ / เดือน** ต้องการไหม?
-8. ต้อง **Export Excel** ไหม?
-9. ต้อง **พิมพ์บิล / ส่งสรุปให้ลูกค้า** ไหม?
-10. มี **เวลาปิดรับ** ต่องวดไหม (เช่น 14:00)?
-
----
-
-~~14. ดึงผลหวยอัตโนมัติ~~ — **ไม่ใช้** ใส่ผลมือที่หน้าออกผล
+## Notes
+- I did not change the preload warning directly because it is a browser optimization warning, not the request failure itself.
+- If the warning remains after the API is stable, it can be reviewed separately.

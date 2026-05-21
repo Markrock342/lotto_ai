@@ -1,23 +1,21 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getHouseConfig } from "@/lib/house-config";
+import { requireSession } from "@/lib/permissions";
 import { serializeRates, type PayoutRates } from "@/lib/rates";
 
 export async function GET() {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  const house = await getHouseConfig(session.houseId);
+  const auth = await requireSession("settings:read");
+  if (auth.error) return auth.error;
+
+  const house = await getHouseConfig(auth.session.houseId);
   return NextResponse.json({ house });
 }
 
 export async function PATCH(request: Request) {
-  const session = await getSession();
-  if (!session || session.role !== "admin") {
-    return NextResponse.json({ error: "เฉพาะแอดมิน" }, { status: 403 });
-  }
+  const auth = await requireSession("settings:write");
+  if (auth.error) return auth.error;
+  const session = auth.session;
 
   const body = (await request.json()) as {
     name?: string;

@@ -57,7 +57,9 @@ export type AggregatedNumber = {
 };
 
 export async function aggregateDraw(drawId: string, rates: PayoutRates) {
-  const bets = await prisma.bet.findMany({ where: { drawId } });
+  const bets = await prisma.bet.findMany({
+    where: { drawId, status: "active" },
+  });
   const perSet = maxRiskPerSet(rates);
   const map = new Map<string, AggregatedNumber>();
 

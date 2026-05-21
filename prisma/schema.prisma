@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -21,15 +21,17 @@ model House {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  houseId      String
-  house        House    @relation(fields: [houseId], references: [id], onDelete: Cascade)
-  username     String
-  passwordHash String
-  displayName  String
-  role         String   @default("staff")
-  createdAt    DateTime @default(now())
-  bets         Bet[]
+  id                String   @id @default(cuid())
+  houseId           String
+  house             House    @relation(fields: [houseId], references: [id], onDelete: Cascade)
+  username          String
+  passwordHash      String
+  displayName       String
+  role              String   @default("staff")
+  tokenVersion      Int      @default(0)
+  passwordChangedAt DateTime?
+  createdAt         DateTime @default(now())
+  bets              Bet[]
 
   @@unique([houseId, username])
 }
@@ -54,11 +56,14 @@ model Bet {
   draw        Draw     @relation(fields: [drawId], references: [id], onDelete: Cascade)
   number      String
   amount      Float
+  status      String   @default("active")
   createdById String?
   createdBy   User?    @relation(fields: [createdById], references: [id])
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@index([drawId, number])
+  @@index([drawId, status])
 }
 
 model NumberLimit {

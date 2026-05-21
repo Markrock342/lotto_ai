@@ -1,11 +1,30 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { BetRecentList } from "@/components/bet-recent-list";
+import { ImageOcrUpload } from "@/components/image-ocr-upload";
 import { SetCapDialog } from "@/components/set-cap-dialog";
-import { SAMPLE_LINE } from "@/lib/sample";
+import { PageHeader, StatBox, ui } from "@/components/ui";
+import { formatBillText } from "@/lib/format-bill";
 import type { NumberSummaryWithLimit, RiskLimitsConfig } from "@/lib/limits";
 import { getCapForNumber } from "@/lib/limits";
+import {
+  compareNumbers,
+  compareStrings,
+  sortIndicator,
+  toggleSortDir,
+  type SortDir,
+} from "@/lib/table-sort";
+
+type SummarySortKey = "number" | "sets" | "totalAmount" | "status";
+
+const STATUS_RANK: Record<string, number> = {
+  full: 0,
+  warning: 1,
+  ok: 2,
+  unlimited: 3,
+};
 
 type SummaryResponse = {
   draw: { id: string; label: string; status?: string };
@@ -21,23 +40,11 @@ type SummaryResponse = {
 
 function StatusBadge({ status }: { status: string }) {
   if (status === "full")
-    return (
-      <span className="rounded-md bg-red-500/20 px-1.5 py-0.5 text-[10px] font-bold text-red-300">
-        เต็ม
-      </span>
-    );
+    return <span className="rounded-md bg-red-100 px-2 py-0.5 text-xs font-bold text-red-600 dark:bg-red-900/50 dark:text-red-300">เต็ม</span>;
   if (status === "warning")
-    return (
-      <span className="rounded-md bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-bold text-amber-300">
-        ใกล้เต็ม
-      </span>
-    );
+    return <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">ใกล้เต็ม</span>;
   if (status === "ok")
-    return (
-      <span className="rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-[10px] text-emerald-300">
-        ปกติ
-      </span>
-    );
+    return <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">ปกติ</span>;
   return null;
 }
 
@@ -51,6 +58,13 @@ export default function KeyPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [blockedList, setBlockedList] = useState<{ number: string; reason?: string }[]>([]);
+  const [reloadBets, setReloadBets] = useState(0);
+  const [canEditLimits, setCanEditLimits] = useState(false);
+  const [pricePerSet, setPricePerSet] = useState<number | null>(null);
+  const [summarySortKey, setSummarySortKey] = useState<SummarySortKey>("totalAmount");
+  const [summarySortDir, setSummarySortDir] = useState<SortDir>("desc");
+  const [selectedNumbers, setSelectedNumbers] = useState<Set<string>>(new Set());
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   const loadSummary = useCallback(async () => {
     const res = await fetch("/api/summary");
@@ -73,6 +87,7 @@ export default function KeyPage() {
           defaultMaxSets: house.defaultMaxSets,
           perNumber,
         });
+        setPricePerSet(house.pricePerSet);
       }
     }
   }, []);
@@ -82,6 +97,16 @@ export default function KeyPage() {
     const t = setInterval(() => void loadSummary(), 4000);
     return () => clearInterval(t);
   }, [loadSummary]);
+
+  useEffect(() => {
+    void (async () => {
+      const res = await fetch("/api/me");
+      if (res.ok) {
+        const { permissions } = await res.json();
+        setCanEditLimits(permissions.includes("limits:write"));
+      }
+    })();
+  }, []);
 
   async function handleImport() {
     setLoading(true);
@@ -99,104 +124,235 @@ export default function KeyPage() {
         if (data.blocked) setBlockedList(data.blocked);
         return;
       }
-      setMessage(
-        `บันทึก ${data.added} รายการ` +
-          (data.skipped > 0 ? ` · ข้ามเลขเต็ม ${data.skipped}` : ""),
-      );
+      setMessage(`บันทึก ${data.added} รายการ` + (data.skipped > 0 ? ` · ข้าม ${data.skipped}` : ""));
       if (data.blocked?.length) setBlockedList(data.blocked);
       setRawText("");
       await loadSummary();
+      setReloadBets((n) => n + 1);
     } finally {
       setLoading(false);
     }
   }
 
   async function handleNewDraw() {
-    if (!confirm("ปิดงวดเดิมและเปิดงวดใหม่? (โพยงวดเก่ายังดูได้ที่ออกผล/ประวัติ)")) return;
+    if (!confirm("ปิดงวดนี้และเปิดงวดใหม่?")) return;
     await fetch("/api/draw", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "new" }),
     });
     await loadSummary();
-    setMessage("เปิดงวดใหม่แล้ว — เริ่มรับโพยงวดใหม่");
+    setMessage("เปิดงวดใหม่แล้ว");
   }
 
-  const rows = (summary?.rows ?? []).filter((r) => {
-    if (onlyFull && r.status !== "full") return false;
-    if (search.trim() && !r.number.includes(search.trim())) return false;
-    return true;
-  });
+  function handleCopySummary() {
+    if (!summary) return;
+    const lines = summary.rows.map(
+      (r) => `${r.number}\t${r.sets} ชุด\t฿${r.totalAmount.toLocaleString()}\t${r.status}`,
+    );
+    void navigator.clipboard.writeText(lines.join("\n"));
+    setMessage("คัดลอกสรุปแล้ว");
+  }
 
-  const capForDialog =
-    capNumber && limitsConfig
-      ? getCapForNumber(capNumber, limitsConfig)
-      : { maxRisk: null, maxSets: null };
+  const filteredRows = useMemo(
+    () =>
+      (summary?.rows ?? []).filter((r) => {
+        if (onlyFull && r.status !== "full") return false;
+        if (search.trim() && !r.number.includes(search.trim())) return false;
+        return true;
+      }),
+    [summary?.rows, onlyFull, search],
+  );
+
+  const rows = useMemo(() => {
+    const list = [...filteredRows];
+    list.sort((a, b) => {
+      if (summarySortKey === "number") {
+        return compareStrings(a.number, b.number, summarySortDir);
+      }
+      if (summarySortKey === "sets") {
+        return compareNumbers(a.sets, b.sets, summarySortDir);
+      }
+      if (summarySortKey === "status") {
+        const ra = STATUS_RANK[a.status] ?? 9;
+        const rb = STATUS_RANK[b.status] ?? 9;
+        return compareNumbers(ra, rb, summarySortDir);
+      }
+      return compareNumbers(a.totalAmount, b.totalAmount, summarySortDir);
+    });
+    return list;
+  }, [filteredRows, summarySortKey, summarySortDir]);
+
+  const allNumbersSelected =
+    rows.length > 0 && rows.every((r) => selectedNumbers.has(r.number));
+
+  function toggleSummarySort(key: SummarySortKey) {
+    if (summarySortKey === key) setSummarySortDir(toggleSortDir(summarySortDir));
+    else {
+      setSummarySortKey(key);
+      setSummarySortDir(key === "number" ? "asc" : "desc");
+    }
+  }
+
+  function toggleNumberSelect(number: string) {
+    setSelectedNumbers((prev) => {
+      const next = new Set(prev);
+      if (next.has(number)) next.delete(number);
+      else next.add(number);
+      return next;
+    });
+  }
+
+  function toggleSelectAllNumbers() {
+    if (allNumbersSelected) setSelectedNumbers(new Set());
+    else setSelectedNumbers(new Set(rows.map((r) => r.number)));
+  }
+
+  async function handleBulkCancelByNumber() {
+    if (selectedNumbers.size === 0) return;
+    if (!confirm(`ยกเลิกโพยเลขที่เลือก ${selectedNumbers.size} เลข (ทุกชุดของเลขนั้น)?`))
+      return;
+    setBulkLoading(true);
+    try {
+      const res = await fetch("/api/bets/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ numbers: [...selectedNumbers] }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMessage(data.error || "ยกเลิกไม่สำเร็จ");
+        return;
+      }
+      setMessage(`ยกเลิกแล้ว ${data.cancelled} รายการ`);
+      setSelectedNumbers(new Set());
+      await loadSummary();
+      setReloadBets((n) => n + 1);
+    } finally {
+      setBulkLoading(false);
+    }
+  }
 
   const drawClosed = summary?.draw.status === "settled";
 
+  function SummarySortTh({
+    label,
+    col,
+    align,
+  }: {
+    label: string;
+    col: SummarySortKey;
+    align?: "right";
+  }) {
+    return (
+      <th className={`${ui.th} ${align === "right" ? "text-right" : ""}`}>
+        <button
+          type="button"
+          onClick={() => toggleSummarySort(col)}
+          className="inline-flex items-center gap-1 font-semibold hover:text-blue-600 dark:hover:text-amber-300"
+        >
+          {label}
+          <span className="text-[10px] opacity-60">
+            {sortIndicator(summarySortKey === col, summarySortDir)}
+          </span>
+        </button>
+      </th>
+    );
+  }
+
   return (
     <>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h1 className="text-lg font-bold text-white">คีย์หวย</h1>
-          <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-            {summary?.draw.label ?? "—"} · วางจาก LINE เท่านั้น ·{" "}
-            {drawClosed ? "ปิดรับแล้ว" : "รับโพยอยู่"}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Link
-            href="/results"
-            className="rounded-lg bg-white/10 px-2 py-1 text-[10px] text-amber-300"
-          >
-            ออกผล →
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <PageHeader
+          title="คีย์หวย"
+          subtitle={`${summary?.draw.label ?? "—"} · ${drawClosed ? "ปิดรับ" : "เปิดรับ"}`}
+        />
+        <div className="flex flex-wrap gap-2">
+          {summary && (
+            <>
+              <button
+                type="button"
+                onClick={() =>
+                  window.open(
+                    `/reports/print?drawId=${summary.draw.id}`,
+                    "_blank",
+                  )
+                }
+                className={ui.btnGhost}
+              >
+                พิมพ์บิล
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const res = await fetch(
+                    `/api/reports/bill?drawId=${summary.draw.id}`,
+                  );
+                  if (!res.ok) return;
+                  const data = await res.json();
+                  await navigator.clipboard.writeText(
+                    formatBillText({
+                      houseName: data.houseName,
+                      drawLabel: data.draw.label,
+                      pricePerSet: data.pricePerSet,
+                      result4: data.draw.result4,
+                      rows: data.rows,
+                      totalSets: data.totalSets,
+                      totalReceived: data.totalReceived,
+                      printedAt: data.printedAt,
+                    }),
+                  );
+                  setMessage("คัดลอกบิลแล้ว");
+                }}
+                className={ui.btnGhost}
+              >
+                คัดลอกบิล
+              </button>
+            </>
+          )}
+          <Link href="/results" className={ui.btnGhost}>
+            ออกผล
           </Link>
-          <button
-            type="button"
-            onClick={handleNewDraw}
-            className="rounded-lg border border-white/10 px-2 py-1 text-[10px] text-slate-400"
-          >
+          <button type="button" onClick={handleNewDraw} className={ui.btnGhost}>
             งวดใหม่
           </button>
         </div>
       </div>
 
       {drawClosed && (
-        <p className="mb-3 rounded-xl bg-amber-950/40 px-3 py-2 text-xs text-amber-200">
-          งวดนี้ออกผลแล้ว — กด「งวดใหม่」เพื่อรับโพยรอบถัดไป
-        </p>
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-200">
+          งวดนี้ปิดรับแล้ว
+        </div>
       )}
 
-      <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
+      <section className={ui.cardPad}>
+        <ImageOcrUpload
+          disabled={drawClosed}
+          onText={(text) => setRawText((prev) => (prev.trim() ? `${prev}\n${text}` : text))}
+          onStatus={setMessage}
+        />
         <textarea
           value={rawText}
           onChange={(e) => setRawText(e.target.value)}
           disabled={drawClosed}
-          placeholder={`คัดลอกจาก LINE วางที่นี่...\n2476\n8210\n20 ชุด`}
-          rows={8}
-          className="w-full resize-y rounded-xl border border-white/10 bg-slate-950/80 px-3 py-3 font-mono text-sm text-amber-50 outline-none focus:ring-2 focus:ring-amber-500/40 disabled:opacity-50"
+          rows={10}
+          className={`${ui.input} mt-3 min-h-[200px] resize-y font-mono disabled:opacity-50`}
         />
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-4 flex flex-wrap gap-2">
           <button
             type="button"
             onClick={handleImport}
             disabled={loading || !rawText.trim() || drawClosed}
-            className="rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-5 py-2.5 text-sm font-bold text-slate-950 disabled:opacity-50"
+            className={ui.btnPrimary}
           >
             {loading ? "กำลังบันทึก..." : "บันทึกโพย"}
           </button>
-          <button
-            type="button"
-            onClick={() => setRawText(SAMPLE_LINE)}
-            className="rounded-xl border border-white/10 px-3 py-2 text-xs text-slate-400"
-          >
-            ตัวอย่าง
-          </button>
         </div>
-        {message && <p className="mt-2 text-xs text-amber-200/90">{message}</p>}
+        {message && (
+          <p className="mt-3 text-sm text-blue-600 dark:text-amber-300">{message}</p>
+        )}
         {blockedList.length > 0 && (
-          <ul className="mt-2 space-y-1 rounded-lg bg-red-950/40 px-3 py-2 text-xs text-red-300">
+          <ul className="mt-2 space-y-1 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-950/50 dark:text-red-300">
             {blockedList.map((b) => (
               <li key={b.number}>{b.reason ?? b.number}</li>
             ))}
@@ -206,60 +362,149 @@ export default function KeyPage() {
 
       {summary && (
         <>
-          <section className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
-            {[
-              { l: "โพย", v: summary.totals.totalSets },
-              { l: "เลข", v: summary.totals.uniqueNumbers },
-              { l: "ยอดรับ", v: `฿${summary.totals.totalReceived.toLocaleString()}` },
-              { l: "เสี่ยง", v: `฿${summary.totals.totalRisk.toLocaleString()}`, w: true },
-              { l: "เลขเต็ม", v: summary.totals.fullCount, w: summary.totals.fullCount > 0 },
-            ].map((c) => (
-              <div
-                key={c.l}
-                className={`rounded-2xl border p-3 text-center ${c.w ? "border-red-500/30 bg-red-950/30" : "border-white/10 bg-white/5"}`}
-              >
-                <p className="text-[10px] text-slate-400">{c.l}</p>
-                <p className="mt-1 text-sm font-bold tabular-nums">{c.v}</p>
-              </div>
-            ))}
-          </section>
+          {pricePerSet != null && (
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+              ราคาต่อชุด (ยอดรับเริ่มต้น):{" "}
+              <strong className="text-slate-900 dark:text-white">
+                {pricePerSet} บาท
+              </strong>
+              {" · "}
+              <Link href="/settings" className="text-blue-600 underline dark:text-amber-400">
+                แก้ที่ตั้งค่า
+              </Link>
+              {" "}
+              — โพยแบบ <code className="text-xs">เลข ยอด</code> ใช้ยอดในข้อความแทน
+            </p>
+          )}
 
-          <section className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-white/5">
-            <div className="flex flex-wrap items-center gap-2 border-b border-white/10 px-4 py-3">
-              <label className="flex items-center gap-1 text-[11px] text-slate-400">
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+            <StatBox label="โพย" value={summary.totals.totalSets} />
+            <StatBox label="เลข" value={summary.totals.uniqueNumbers} />
+            <StatBox label="ยอดรับ" value={`฿${summary.totals.totalReceived.toLocaleString()}`} variant="accent" />
+            <StatBox label="เสี่ยง" value={`฿${summary.totals.totalRisk.toLocaleString()}`} variant="danger" />
+            <StatBox label="เลขเต็ม" value={summary.totals.fullCount} variant={summary.totals.fullCount > 0 ? "danger" : "default"} />
+          </div>
+
+          <section className={`mt-4 ${ui.tableWrap}`}>
+            <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-700">
+              <span className="text-sm font-bold text-slate-800 dark:text-slate-200">สรุปต่อเลข</span>
+              <label className="flex items-center gap-2 text-sm text-slate-600">
                 <input type="checkbox" checked={onlyFull} onChange={(e) => setOnlyFull(e.target.checked)} />
                 เฉพาะเลขเต็ม
               </label>
+              {!drawClosed && selectedNumbers.size > 0 && (
+                <button
+                  type="button"
+                  disabled={bulkLoading}
+                  onClick={() => void handleBulkCancelByNumber()}
+                  className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                >
+                  {bulkLoading ? "กำลังลบ..." : `ลบเลขที่เลือก (${selectedNumbers.size})`}
+                </button>
+              )}
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="ค้นหา..."
-                className="ml-auto w-24 rounded-lg border border-white/10 bg-slate-950 px-2 py-1 text-xs"
+                placeholder="ค้นหาเลข"
+                className="ml-auto w-32 rounded-lg border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800"
               />
+              <button type="button" onClick={handleCopySummary} className={ui.btnGhost}>
+                คัดลอก
+              </button>
             </div>
-            <div className="max-h-[45vh] overflow-auto">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-slate-900 text-[10px] uppercase text-slate-500">
+            <div className="max-h-[50vh] overflow-auto">
+              <table className="w-full">
+                <thead>
                   <tr>
-                    <th className="px-2 py-2">เลข</th>
-                    <th className="px-2 py-2 text-right">ชุด</th>
-                    <th className="px-2 py-2 text-right">รับ</th>
-                    <th className="px-2 py-2">สถานะ</th>
+                    {!drawClosed && (
+                      <th className={`${ui.th} w-10`}>
+                        <input
+                          type="checkbox"
+                          checked={allNumbersSelected}
+                          onChange={toggleSelectAllNumbers}
+                          aria-label="เลือกเลขทั้งหมด"
+                        />
+                      </th>
+                    )}
+                    <SummarySortTh label="เลข" col="number" />
+                    <SummarySortTh label="ชุด" col="sets" align="right" />
+                    <SummarySortTh label="ยอดรับ" col="totalAmount" align="right" />
+                    <SummarySortTh label="สถานะ" col="status" />
+                    {canEditLimits && <th className={ui.th} />}
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row) => (
-                    <tr
-                      key={row.number}
-                      onClick={() => setCapNumber(row.number)}
-                      className={`cursor-pointer border-t border-white/5 hover:bg-amber-500/10 ${row.status === "full" ? "bg-red-950/25" : ""}`}
-                    >
-                      <td className="px-2 py-3 font-mono font-bold text-amber-200">{row.number}</td>
-                      <td className="px-2 py-3 text-right tabular-nums">{row.sets}</td>
-                      <td className="px-2 py-3 text-right tabular-nums">{row.totalAmount.toLocaleString()}</td>
-                      <td className="px-2 py-3"><StatusBadge status={row.status} /></td>
+                  {rows.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={
+                          4 + (drawClosed ? 0 : 1) + (canEditLimits ? 1 : 0)
+                        }
+                        className="py-10 text-center text-sm text-slate-500"
+                      >
+                        ยังไม่มีโพย
+                      </td>
                     </tr>
-                  ))}
+                  ) : (
+                    rows.map((row) => {
+                      const isSelected = selectedNumbers.has(row.number);
+                      return (
+                      <tr
+                        key={row.number}
+                        className={`${row.status === "full" ? "bg-red-50 dark:bg-red-950/30" : ""} ${
+                          isSelected ? "bg-blue-50/80 dark:bg-blue-950/30" : "hover:bg-blue-50/50 dark:hover:bg-slate-800/50"
+                        }`}
+                      >
+                        {!drawClosed && (
+                          <td className={ui.td}>
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleNumberSelect(row.number)}
+                              aria-label={`เลือก ${row.number}`}
+                            />
+                          </td>
+                        )}
+                        <td className={`${ui.td} font-mono text-lg font-bold tracking-widest`}>
+                          {!drawClosed ? (
+                            <button
+                              type="button"
+                              onClick={() => toggleNumberSelect(row.number)}
+                              className="cursor-pointer hover:text-blue-600 dark:hover:text-amber-300"
+                            >
+                              {row.number}
+                            </button>
+                          ) : (
+                            row.number
+                          )}
+                        </td>
+                        <td className={`${ui.td} text-right tabular-nums`}>
+                          {row.sets}
+                          {row.capSets != null && (
+                            <span className="text-xs text-slate-400">/{row.capSets}</span>
+                          )}
+                        </td>
+                        <td className={`${ui.td} text-right font-medium tabular-nums`}>
+                          {row.totalAmount.toLocaleString()}
+                        </td>
+                        <td className={ui.td}>
+                          <StatusBadge status={row.status} />
+                        </td>
+                        {canEditLimits && (
+                          <td className={ui.td}>
+                            <button
+                              type="button"
+                              onClick={() => setCapNumber(row.number)}
+                              className="text-xs text-blue-600 hover:underline dark:text-amber-400"
+                            >
+                              เพดาน
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
@@ -267,10 +512,16 @@ export default function KeyPage() {
         </>
       )}
 
+      <BetRecentList
+        key={reloadBets}
+        drawClosed={drawClosed}
+        onChanged={() => void loadSummary()}
+      />
+
       {capNumber && limitsConfig && (
         <SetCapDialog
           number={capNumber}
-          current={capForDialog}
+          current={getCapForNumber(capNumber, limitsConfig)}
           onSave={async (cap) => {
             await fetch("/api/limits", {
               method: "PUT",

@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
-import { getSession, hashPassword } from "@/lib/auth";
+import { hashPassword } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { validatePassword, validateUsername } from "@/lib/password";
+import { requireSession } from "@/lib/permissions";
 
 export async function GET() {
-  const session = await getSession();
-  if (!session || session.role !== "admin") {
-    return NextResponse.json({ error: "เฉพาะแอดมิน" }, { status: 403 });
-  }
+  const auth = await requireSession("users:manage");
+  if (auth.error) return auth.error;
+  const session = auth.session;
 
   const users = await prisma.user.findMany({
     where: { houseId: session.houseId },
@@ -24,10 +25,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const session = await getSession();
-  if (!session || session.role !== "admin") {
-    return NextResponse.json({ error: "เฉพาะแอดมิน" }, { status: 403 });
-  }
+  const auth = await requireSession("users:manage");
+  if (auth.error) return auth.error;
+  const session = auth.session;
 
   const count = await prisma.user.count({
     where: { houseId: session.houseId },
@@ -46,15 +46,31 @@ export async function POST(request: Request) {
     role?: string;
   };
 
-  if (!body.username?.trim() || !body.password || body.password.length < 4) {
-    return NextResponse.json(
-      { error: "กรอกชื่อผู้ใช้และรหัสผ่าน (อย่างน้อย 4 ตัว)" },
-      { status: 400 },
-    );
+  const username = body.username?.trim().toLowerCase() ?? "";
+  const userErr = validateUsername(username);
+  if (userErr) {
+    return NextResponse.json({ error: userErr }, { status: 400 });
+  }
+  const pwErr = body.password ? validatePassword(body.password) : "กรอกรหัสผ่าน";
+  if (pwErr) {
+    return NextResponse.json({ error: pwErr }, { status: 400 });
+  }
+
+  const role = body.role === "admin" ? "admin" : "staff";
+  if (role === "admin") {
+    const adminCount = await prisma.user.count({
+      where: { houseId: session.houseId, role: "admin" },
+    });
+    if (adminCount >= 2) {
+      return NextResponse.json(
+        { error: "มีบัญชีเจ้ามือครบแล้ว (สูงสุด 2)" },
+        { status: 400 },
+      );
+    }
   }
 
   const exists = await prisma.user.findFirst({
-    where: { houseId: session.houseId, username: body.username.trim() },
+    where: { houseId: session.houseId, username },
   });
   if (exists) {
     return NextResponse.json({ error: "ชื่อผู้ใช้ซ้ำ" }, { status: 400 });
@@ -63,10 +79,10 @@ export async function POST(request: Request) {
   const user = await prisma.user.create({
     data: {
       houseId: session.houseId,
-      username: body.username.trim(),
-      passwordHash: await hashPassword(body.password),
-      displayName: body.displayName?.trim() || body.username.trim(),
-      role: body.role === "admin" ? "admin" : "staff",
+      username,
+      passwordHash: await hashPassword(body.password!),
+      displayName: body.displayName?.trim() || username,
+      role,
     },
     select: {
       id: true,

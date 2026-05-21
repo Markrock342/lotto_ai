@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { requireSession } from "@/lib/permissions";
 import { prisma } from "@/lib/db";
 import { getActiveOpenDraw, getDrawForSettlement } from "@/lib/draw-context";
 import { getHouseConfig } from "@/lib/house-config";
@@ -7,10 +7,9 @@ import { getOrCreateOpenDraw } from "@/lib/house-config";
 import { settleDraw } from "@/lib/settlement";
 
 export async function GET() {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireSession("results:read");
+  if (auth.error) return auth.error;
+  const session = auth.session;
 
   const draw = await getDrawForSettlement(session.houseId);
   const house = await getHouseConfig(session.houseId);
@@ -22,7 +21,9 @@ export async function GET() {
     });
   }
 
-  const bets = await prisma.bet.findMany({ where: { drawId: draw.id } });
+  const bets = await prisma.bet.findMany({
+    where: { drawId: draw.id, status: "active" },
+  });
   const settlement = settleDraw(bets, { fourDigit: draw.result4 }, house.rates);
 
   return NextResponse.json({
@@ -39,10 +40,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireSession("results:settle");
+  if (auth.error) return auth.error;
+  const session = auth.session;
 
   const body = (await request.json()) as { fourDigit?: string };
   const raw = body.fourDigit?.replace(/\D/g, "") ?? "";
@@ -59,13 +59,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "ไม่มีงวดที่เปิดรับอยู่" }, { status: 400 });
   }
 
-  const betCount = await prisma.bet.count({ where: { drawId: draw.id } });
+  const betCount = await prisma.bet.count({
+    where: { drawId: draw.id, status: "active" },
+  });
   if (betCount === 0) {
     return NextResponse.json({ error: "ยังไม่มีโพยในงวดนี้" }, { status: 400 });
   }
 
   const house = await getHouseConfig(session.houseId);
-  const bets = await prisma.bet.findMany({ where: { drawId: draw.id } });
+  const bets = await prisma.bet.findMany({
+    where: { drawId: draw.id, status: "active" },
+  });
   const settlement = settleDraw(bets, { fourDigit }, house.rates);
 
   await prisma.draw.update({

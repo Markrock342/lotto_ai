@@ -14,6 +14,9 @@ const DEFAULT_RATES = {
 };
 
 async function main() {
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? "Admin@2026";
+  const staffPassword = process.env.SEED_STAFF_PASSWORD ?? "Staff@2026";
+
   await prisma.bet.deleteMany();
   await prisma.draw.deleteMany();
   await prisma.numberLimit.deleteMany();
@@ -23,42 +26,43 @@ async function main() {
   const house = await prisma.house.create({
     data: {
       name: "บ้านหวยลาว",
-      pricePerSet: 120,
+      pricePerSet: 80,
       defaultMaxSets: null,
       defaultMaxRisk: null,
       ratesJson: JSON.stringify(DEFAULT_RATES),
     },
   });
 
-  const hash = await bcrypt.hash("1234", 10);
+  const adminHash = await bcrypt.hash(adminPassword, 10);
+  const staffHash = await bcrypt.hash(staffPassword, 10);
 
   await prisma.user.createMany({
     data: [
       {
         houseId: house.id,
         username: "admin",
-        passwordHash: hash,
+        passwordHash: adminHash,
         displayName: "เจ้ามือ",
         role: "admin",
       },
       {
         houseId: house.id,
         username: "staff1",
-        passwordHash: hash,
+        passwordHash: staffHash,
         displayName: "ลูกมือ 1",
         role: "staff",
       },
       {
         houseId: house.id,
         username: "staff2",
-        passwordHash: hash,
+        passwordHash: staffHash,
         displayName: "ลูกมือ 2",
         role: "staff",
       },
       {
         houseId: house.id,
         username: "staff3",
-        passwordHash: hash,
+        passwordHash: staffHash,
         displayName: "ลูกมือ 3",
         role: "staff",
       },
@@ -74,7 +78,9 @@ async function main() {
   });
 
   console.log("Seed OK — house:", house.name);
-  console.log("Login: admin / 1234 (และ staff1, staff2, staff3)");
+  console.log("  admin  →", adminPassword);
+  console.log("  staff* →", staffPassword);
+  console.log("  ตั้ง SEED_ADMIN_PASSWORD / SEED_STAFF_PASSWORD ใน .env ก่อน production");
 }
 
 main()

@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { DEFAULT_RATES, RATE_LABELS, type PayoutRates } from "@/lib/rates";
+import { PageHeader, ui, Loading } from "@/components/ui";
+import { PASSWORD_MIN_LENGTH } from "@/lib/password";
+import { RATE_LABELS, type PayoutRates } from "@/lib/rates";
 
 type HouseData = {
   name: string;
@@ -13,33 +15,66 @@ type HouseData = {
 
 export default function SettingsPage() {
   const [house, setHouse] = useState<HouseData | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [canEditSettings, setCanEditSettings] = useState(false);
   const [saved, setSaved] = useState(false);
   const [defaultMaxRisk, setDefaultMaxRisk] = useState("");
   const [defaultMaxSets, setDefaultMaxSets] = useState("");
+  const [pw, setPw] = useState({
+    current: "",
+    next: "",
+    confirm: "",
+  });
+  const [pwError, setPwError] = useState("");
+  const [pwOk, setPwOk] = useState(false);
+  const [pwLoading, setPwLoading] = useState(false);
 
   useEffect(() => {
     void (async () => {
-      const [meRes, setRes] = await Promise.all([
-        fetch("/api/me"),
-        fetch("/api/settings"),
-      ]);
+      const [meRes, setRes] = await Promise.all([fetch("/api/me"), fetch("/api/settings")]);
       if (meRes.ok) {
-        const { user } = await meRes.json();
-        setIsAdmin(user.role === "admin");
+        const me = await meRes.json();
+        setCanEditSettings(
+          Array.isArray(me.permissions) && me.permissions.includes("settings:write"),
+        );
       }
       if (setRes.ok) {
         const { house: h } = await setRes.json();
         setHouse(h);
-        setDefaultMaxRisk(
-          h.defaultMaxRisk != null ? String(h.defaultMaxRisk) : "",
-        );
-        setDefaultMaxSets(
-          h.defaultMaxSets != null ? String(h.defaultMaxSets) : "",
-        );
+        setDefaultMaxRisk(h.defaultMaxRisk != null ? String(h.defaultMaxRisk) : "");
+        setDefaultMaxSets(h.defaultMaxSets != null ? String(h.defaultMaxSets) : "");
       }
     })();
   }, []);
+
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setPwError("");
+    setPwOk(false);
+    setPwLoading(true);
+    try {
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentPassword: pw.current,
+          newPassword: pw.next,
+          confirmPassword: pw.confirm,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPwError(data.error || "เปลี่ยนรหัสผ่านไม่สำเร็จ");
+        return;
+      }
+      setPw({ current: "", next: "", confirm: "" });
+      setPwOk(true);
+      setTimeout(() => setPwOk(false), 4000);
+    } catch {
+      setPwError("เชื่อมต่อไม่สำเร็จ");
+    } finally {
+      setPwLoading(false);
+    }
+  }
 
   async function handleSave() {
     if (!house) return;
@@ -50,12 +85,8 @@ export default function SettingsPage() {
         name: house.name,
         pricePerSet: house.pricePerSet,
         rates: house.rates,
-        defaultMaxRisk: defaultMaxRisk.trim()
-          ? Number(defaultMaxRisk)
-          : null,
-        defaultMaxSets: defaultMaxSets.trim()
-          ? Number(defaultMaxSets)
-          : null,
+        defaultMaxRisk: defaultMaxRisk.trim() ? Number(defaultMaxRisk) : null,
+        defaultMaxSets: defaultMaxSets.trim() ? Number(defaultMaxSets) : null,
       }),
     });
     if (res.ok) {
@@ -64,108 +95,148 @@ export default function SettingsPage() {
     }
   }
 
-  if (!house) {
-    return <p className="text-sm text-slate-500">กำลังโหลด...</p>;
-  }
+  if (!house) return <Loading />;
 
   return (
     <>
-      <h1 className="text-lg font-bold text-white">ตั้งค่าระบบ</h1>
-      <p className="text-xs text-slate-400">
-        ปรับเรทจ่ายได้ตลอด + เพดานความเสี่ยง (admin)
-        {!isAdmin && " · ลูกมือดูอย่างเดียว"}
-      </p>
+      <PageHeader
+        title="ตั้งค่าระบบ"
+        subtitle={
+          canEditSettings
+            ? "เจ้ามือ — แก้เรทและตั้งค่าบ้านได้"
+            : "ลูกมือ — ดูอย่างเดียว (แก้ไขไม่ได้)"
+        }
+      />
 
-      <section className="mt-4 space-y-4 rounded-2xl border border-white/10 bg-white/5 p-4">
-        <div>
-          <label className="text-xs text-slate-400">ชื่อบ้าน</label>
+      <section className={`${ui.cardPad} space-y-4`}>
+        <Field label="ชื่อบ้าน">
           <input
             value={house.name}
-            disabled={!isAdmin}
+            disabled={!canEditSettings}
             onChange={(e) => setHouse({ ...house, name: e.target.value })}
-            className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm disabled:opacity-60"
+            className={ui.inputSm}
           />
-        </div>
-        <div>
-          <label className="text-xs text-slate-400">ราคาต่อ 1 ชุด (บาท)</label>
+        </Field>
+        <Field label="ราคาต่อ 1 ชุด (บาท)">
           <input
             type="number"
             min={1}
-            disabled={!isAdmin}
+            disabled={!canEditSettings}
             value={house.pricePerSet}
             onChange={(e) =>
-              setHouse({
-                ...house,
-                pricePerSet: Math.max(1, Number(e.target.value) || 1),
-              })
+              setHouse({ ...house, pricePerSet: Math.max(1, Number(e.target.value) || 1) })
             }
-            className="mt-1 w-32 rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm disabled:opacity-60"
+            className={`${ui.inputSm} max-w-[160px]`}
           />
-        </div>
-        <div>
-          <label className="text-xs text-slate-400">
-            เสี่ยงจ่ายสูงสุดต่อเลข (บาท) — ว่าง = ไม่จำกัด
-          </label>
+        </Field>
+        <Field label="เสี่ยงจ่ายสูงสุดต่อเลข">
           <input
             type="number"
-            disabled={!isAdmin}
+            disabled={!canEditSettings}
             value={defaultMaxRisk}
             onChange={(e) => setDefaultMaxRisk(e.target.value)}
-            placeholder="500000"
-            className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm disabled:opacity-60"
+            className={ui.inputSm}
           />
-        </div>
-        <div>
-          <label className="text-xs text-slate-400">
-            ชุดสูงสุดต่อเลข — เช่น 2357 ไม่เกิน 10 ชุด
-          </label>
+        </Field>
+        <Field label="ชุดสูงสุดต่อเลข">
           <input
             type="number"
-            disabled={!isAdmin}
+            disabled={!canEditSettings}
             value={defaultMaxSets}
             onChange={(e) => setDefaultMaxSets(e.target.value)}
-            placeholder="10"
-            className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm disabled:opacity-60"
+            className={ui.inputSm}
           />
-        </div>
+        </Field>
       </section>
 
-      <section className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
-        <h2 className="text-sm font-semibold text-amber-300">อัตราจ่าย</h2>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+      <section className={`mt-4 ${ui.cardPad}`}>
+        <h2 className="text-sm font-bold text-blue-700 dark:text-amber-300">อัตราจ่าย (บาท/ชุด)</h2>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
           {RATE_LABELS.map(({ key, label }) => (
             <div key={key}>
-              <label className="text-xs text-slate-400">{label}</label>
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{label}</label>
               <input
                 type="number"
                 min={0}
-                disabled={!isAdmin}
+                disabled={!canEditSettings}
                 value={house.rates[key]}
                 onChange={(e) =>
                   setHouse({
                     ...house,
-                    rates: {
-                      ...house.rates,
-                      [key]: Math.max(0, Number(e.target.value) || 0),
-                    },
+                    rates: { ...house.rates, [key]: Math.max(0, Number(e.target.value) || 0) },
                   })
                 }
-                className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 font-mono text-sm disabled:opacity-60"
+                className={`${ui.inputSm} mt-1 font-mono`}
               />
             </div>
           ))}
         </div>
       </section>
 
-      {isAdmin && (
-        <button
-          type="button"
-          onClick={handleSave}
-          className="mt-4 w-full rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 py-3.5 text-sm font-bold text-slate-950"
-        >
+      {canEditSettings && (
+        <button type="button" onClick={handleSave} className={`${ui.btnPrimary} mt-4 w-full`}>
           {saved ? "บันทึกแล้ว ✓" : "บันทึกการตั้งค่า"}
         </button>
       )}
+
+      <section className={`mt-6 ${ui.cardPad}`}>
+        <h2 className="text-sm font-bold text-blue-700 dark:text-amber-300">เปลี่ยนรหัสผ่าน</h2>
+        <p className="mt-1 text-xs text-slate-500">
+          ใช้ได้ทุกบทบาท · หลังเปลี่ยน เครื่องอื่นที่ login อยู่จะออกอัตโนมัติ
+        </p>
+        <form onSubmit={handleChangePassword} className="mt-4 space-y-3">
+          <Field label="รหัสผ่านปัจจุบัน">
+            <input
+              type="password"
+              value={pw.current}
+              onChange={(e) => setPw({ ...pw, current: e.target.value })}
+              className={ui.inputSm}
+              autoComplete="current-password"
+              required
+            />
+          </Field>
+          <Field label={`รหัสผ่านใหม่ (อย่างน้อย ${PASSWORD_MIN_LENGTH} ตัว · มีตัวอักษร+เลข)`}>
+            <input
+              type="password"
+              value={pw.next}
+              onChange={(e) => setPw({ ...pw, next: e.target.value })}
+              className={ui.inputSm}
+              autoComplete="new-password"
+              minLength={PASSWORD_MIN_LENGTH}
+              required
+            />
+          </Field>
+          <Field label="ยืนยันรหัสผ่านใหม่">
+            <input
+              type="password"
+              value={pw.confirm}
+              onChange={(e) => setPw({ ...pw, confirm: e.target.value })}
+              className={ui.inputSm}
+              autoComplete="new-password"
+              minLength={PASSWORD_MIN_LENGTH}
+              required
+            />
+          </Field>
+          {pwError && <p className="text-sm text-red-600 dark:text-red-300">{pwError}</p>}
+          {pwOk && (
+            <p className="text-sm text-emerald-600 dark:text-emerald-300">
+              เปลี่ยนรหัสผ่านแล้ว — เครื่องอื่นต้อง login ใหม่
+            </p>
+          )}
+          <button type="submit" disabled={pwLoading} className={`${ui.btnGhost} w-full`}>
+            {pwLoading ? "กำลังบันทึก..." : "เปลี่ยนรหัสผ่าน"}
+          </button>
+        </form>
+      </section>
     </>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{label}</label>
+      <div className="mt-1">{children}</div>
+    </div>
   );
 }

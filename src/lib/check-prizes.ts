@@ -25,7 +25,7 @@ function isPermutation(a: string, b: string): boolean {
   return a.length === b.length && sortDigits(a) === sortDigits(b);
 }
 
-/** ตรวจรางวัล 1 ชุด (เลข 4 หลัก) กับผลออก — ถูกได้หลายประเภทพร้อมกัน */
+/** ตรวจรางวัลชุด 4 ตัว — จ่ายเฉพาะรางวัลเดียวที่มูลค่าสูงสุด */
 export function checkWinsForNumber(
   betNumber: string,
   result: DrawResultInput,
@@ -33,18 +33,18 @@ export function checkWinsForNumber(
 ): WinLine[] {
   const b = pad4(betNumber);
   const r = pad4(result.fourDigit);
-  const wins: WinLine[] = [];
+  const candidates: WinLine[] = [];
   const label = (t: WinType) =>
     RATE_LABELS.find((x) => x.key === t)?.label ?? t;
 
   if (b === r) {
-    wins.push({
+    candidates.push({
       type: "fourStraight",
       label: label("fourStraight"),
       payout: rates.fourStraight,
     });
   } else if (isPermutation(b, r)) {
-    wins.push({
+    candidates.push({
       type: "fourTod",
       label: label("fourTod"),
       payout: rates.fourTod,
@@ -54,13 +54,13 @@ export function checkWinsForNumber(
   const b3 = b.slice(-3);
   const r3 = r.slice(-3);
   if (b3 === r3) {
-    wins.push({
+    candidates.push({
       type: "threeStraight",
       label: label("threeStraight"),
       payout: rates.threeStraight,
     });
   } else if (isPermutation(b3, r3)) {
-    wins.push({
+    candidates.push({
       type: "threeTod",
       label: label("threeTod"),
       payout: rates.threeTod,
@@ -68,28 +68,30 @@ export function checkWinsForNumber(
   }
 
   if (b.slice(0, 3) === r.slice(0, 3)) {
-    wins.push({
+    candidates.push({
       type: "threeFront",
       label: label("threeFront"),
       payout: rates.threeFront,
     });
   }
   if (b.slice(0, 2) === r.slice(0, 2)) {
-    wins.push({
+    candidates.push({
       type: "twoFront",
       label: label("twoFront"),
       payout: rates.twoFront,
     });
   }
   if (b.slice(-2) === r.slice(-2)) {
-    wins.push({
+    candidates.push({
       type: "twoBack",
       label: label("twoBack"),
       payout: rates.twoBack,
     });
   }
 
-  return wins;
+  if (candidates.length === 0) return [];
+  const best = candidates.reduce((a, c) => (c.payout > a.payout ? c : a));
+  return [best];
 }
 
 export function totalPayoutForWins(wins: WinLine[]): number {

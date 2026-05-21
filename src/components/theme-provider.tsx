@@ -27,7 +27,6 @@ function applyTheme(theme: Theme) {
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>("light");
-  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
@@ -39,7 +38,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
           : "light";
     setThemeState(initial);
     applyTheme(initial);
-    setReady(true);
   }, []);
 
   const setTheme = useCallback((t: Theme) => {
@@ -49,12 +47,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const toggle = useCallback(() => {
-    setTheme(theme === "light" ? "dark" : "light");
-  }, [theme, setTheme]);
+    setThemeState((prev) => {
+      const next: Theme = prev === "light" ? "dark" : "light";
+      localStorage.setItem(STORAGE_KEY, next);
+      applyTheme(next);
+      return next;
+    });
+  }, []);
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme, toggle }}>
-      <div className={`min-h-full ${ready ? "" : "opacity-0"}`}>{children}</div>
+      {children}
     </ThemeContext.Provider>
   );
 }

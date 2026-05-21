@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const user = await verifyLogin(body.username.trim(), body.password);
+  const user = await verifyLogin(body.username.trim().toLowerCase(), body.password);
   if (!user) {
     return NextResponse.json(
       { error: "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง" },
@@ -28,6 +28,7 @@ export async function POST(request: Request) {
     username: user.username,
     displayName: user.displayName,
     role: user.role,
+    tokenVersion: user.tokenVersion,
   });
 
   return NextResponse.json({

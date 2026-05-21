@@ -1,23 +1,22 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { requireSession } from "@/lib/permissions";
 import { prisma } from "@/lib/db";
+import { getDisplayDraw } from "@/lib/draw-context";
 import {
   aggregateDraw,
   getHouseConfig,
   getLimitsMap,
-  getOrCreateOpenDraw,
 } from "@/lib/house-config";
 import { attachLimits } from "@/lib/limits";
 import type { RiskLimitsConfig } from "@/lib/limits";
 
 export async function GET() {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireSession("bets:read");
+  if (auth.error) return auth.error;
+  const session = auth.session;
 
   const house = await getHouseConfig(session.houseId);
-  const draw = await getOrCreateOpenDraw(session.houseId);
+  const draw = await getDisplayDraw(session.houseId);
   const aggregated = await aggregateDraw(draw.id, house.rates);
   const limitsMap = await getLimitsMap(session.houseId);
 

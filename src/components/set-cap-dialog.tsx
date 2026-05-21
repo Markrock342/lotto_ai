@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { NumberCap } from "@/lib/limits";
+import { ui } from "@/components/ui";
 
 export function SetCapDialog({
   number,
@@ -25,40 +26,37 @@ export function SetCapDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 sm:items-center"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm rounded-2xl border border-white/10 bg-slate-900 p-4 shadow-2xl"
+        className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-900"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="font-mono text-lg font-bold text-amber-200">{number}</h3>
-        <p className="mt-1 text-xs text-slate-400">
-          กำหนดเพดานรับความเสี่ยงของเลขนี้ (อั้นเลข)
-        </p>
+        <h3 className="font-mono text-2xl font-bold tracking-widest text-slate-900 dark:text-amber-200">
+          {number}
+        </h3>
 
-        <label className="mt-4 block text-xs text-slate-400">
-          เสี่ยงจ่ายสูงสุด (บาท) — ว่าง = ใช้ค่าทั้งบ้าน
+        <label className="mt-4 block text-sm text-slate-600 dark:text-slate-400">
+          เสี่ยงจ่ายสูงสุด (บาท)
         </label>
         <input
           type="number"
           min={0}
           value={maxRisk}
           onChange={(e) => setMaxRisk(e.target.value)}
-          placeholder="เช่น 500000"
-          className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-500/50"
+          className={`${ui.inputSm} mt-1`}
         />
 
-        <label className="mt-3 block text-xs text-slate-400">
-          จำนวนชุดสูงสุด — ว่าง = ไม่จำกัดชุด
+        <label className="mt-3 block text-sm text-slate-600 dark:text-slate-400">
+          จำนวนชุดสูงสุด
         </label>
         <input
           type="number"
           min={0}
           value={maxSets}
           onChange={(e) => setMaxSets(e.target.value)}
-          placeholder="เช่น 50"
-          className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-500/50"
+          className={`${ui.inputSm} mt-1`}
         />
 
         <div className="mt-4 flex flex-col gap-2">
@@ -70,22 +68,14 @@ export function SetCapDialog({
                 maxSets: maxSets.trim() ? Number(maxSets) : null,
               })
             }
-            className="rounded-xl bg-amber-500 py-2.5 text-sm font-bold text-slate-950"
+            className={ui.btnPrimary}
           >
-            บันทึกเพดานเลขนี้
+            บันทึก
           </button>
-          <button
-            type="button"
-            onClick={onClear}
-            className="rounded-xl border border-white/10 py-2 text-xs text-slate-400"
-          >
-            ลบเพดานเฉพาะเลข (ใช้ค่าทั้งบ้าน)
+          <button type="button" onClick={onClear} className={ui.btnGhost}>
+            ลบเพดานเฉพาะเลข
           </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="py-2 text-xs text-slate-500"
-          >
+          <button type="button" onClick={onClose} className="py-2 text-sm text-slate-500">
             ปิด
           </button>
         </div>

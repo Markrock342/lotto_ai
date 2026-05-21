@@ -18,16 +18,15 @@ export const DEFAULT_RATES: PayoutRates = {
   twoBack: 1_500,
 };
 
-export const RATE_LABELS: { key: keyof PayoutRates; label: string; hint: string }[] =
-  [
-    { key: "fourStraight", label: "4 ตัวตรง", hint: "ตรง 4 หลัก" },
-    { key: "fourTod", label: "4 ตัวโต๊ด", hint: "สลับ 4 หลัก" },
-    { key: "threeStraight", label: "3 ตัวตรง", hint: "ตรง 3 หลักท้าย" },
-    { key: "threeTod", label: "3 ตัวโต๊ด", hint: "สลับ 3 หลักท้าย" },
-    { key: "threeFront", label: "3 ตัวหน้า", hint: "3 หลักหน้า" },
-    { key: "twoFront", label: "2 ตัวหน้า", hint: "2 หลักหน้า" },
-    { key: "twoBack", label: "2 ตัวหลัง", hint: "2 หลักท้าย" },
-  ];
+export const RATE_LABELS: { key: keyof PayoutRates; label: string }[] = [
+  { key: "fourStraight", label: "4 ตัวตรง" },
+  { key: "fourTod", label: "4 ตัวโต๊ด" },
+  { key: "threeStraight", label: "3 ตัวตรง" },
+  { key: "threeTod", label: "3 ตัวโต๊ด" },
+  { key: "threeFront", label: "3 ตัวหน้า" },
+  { key: "twoFront", label: "2 ตัวหน้า" },
+  { key: "twoBack", label: "2 ตัวหลัง" },
+];
 
 export function parseRatesJson(json: string): PayoutRates {
   try {

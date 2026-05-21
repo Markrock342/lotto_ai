@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* dark: ตามปุ่มสลับธีม (data-theme) ไม่ใช่ prefers-color-scheme ของ OS */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
 /* ── Light (แบบ KD LOT) ── */
 :root,
 [data-theme="light"] {
@@ -57,6 +60,13 @@ body {
   color: var(--text-primary);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
   transition: background 0.2s, color 0.2s;
+}
+
+@media print {
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
 }
 
 /* utility classes for themed UI */

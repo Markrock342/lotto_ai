@@ -1,47 +1,102 @@
-# ระบบคีย์หวยลาวชุด (เต็มระบบ)
+# ระบบคีย์หวยลาวชุด
 
-เว็บรับแทงสำหรับเจ้ามือ — วางโพยจาก LINE · เรทปรับหลังบ้านได้ · iPad/คอม 3–4 เครื่อง · อั้นเลข · ออกผล · แดชบอร์ด
+เว็บรับโพยจาก LINE · สรุปยอดต่อเลข · เรทจ่าย · ออกผล · หลายเครื่อง (admin / ลูกมือ)
 
-## เริ่มใช้งาน
+## Tech
+
+- Next.js 16 · Prisma · **PostgreSQL (Supabase)** · Deploy บน **Vercel**
+
+> **สำคัญ:** Vercel ใช้ SQLite ไม่ได้ — ต้องใช้ Supabase (หรือ Postgres อื่น)
+
+---
+
+## 1) Supabase (ฐานข้อมูล + backup)
+
+1. สร้างโปรเจกต์ที่ [supabase.com](https://supabase.com)
+2. **Database → Connection string → URI** (Transaction pooler สำหรับ Vercel)
+3. **Storage → New bucket** ชื่อ `backups` (Private)
+4. **Settings → API** คัดลอก `URL` และ `service_role` key (เก็บเป็นความลับ)
+
+Backup อัตโนมัติ:
+
+| ช่องทาง | รายละเอียด |
+|--------|-------------|
+| Supabase Pro | backup รายวันของแพลตฟอร์ม |
+| Vercel Cron | ทุกวัน 02:00 เรียก `/api/cron/backup` → อัป JSON ขึ้น bucket `backups` |
+| มือ | `npm run db:backup` → ไฟล์ในโฟลเดอร์ `backups/` |
+
+---
+
+## 2) Vercel Deploy
+
+1. Push โค้ดขึ้น GitHub แล้ว Import ใน Vercel
+2. ตั้ง **Environment Variables** (Production):
+
+| ตัวแปร | ค่า |
+|--------|-----|
+| `DATABASE_URL` | Connection string จาก Supabase (pooler) |
+| `SESSION_SECRET` | สุ่มยาว ≥ 32 ตัว |
+| `CRON_SECRET` | สุ่ม (ให้ตรงกับที่ Vercel Cron ส่ง) |
+| `SUPABASE_URL` | `https://xxx.supabase.co` |
+| `SUPABASE_SERVICE_ROLE_KEY` | service role key |
+| `SUPABASE_BACKUP_BUCKET` | `backups` |
+| `SEED_ADMIN_PASSWORD` | รหัสเจ้ามือ (ตั้งครั้งแรกเท่านั้น) |
+| `SEED_STAFF_PASSWORD` | รหัสลูกมือ |
+
+3. Deploy — build จะรัน `prisma migrate deploy` สร้างตารางอัตโนมัติ
+
+4. **Seed ครั้งแรก** (หลัง deploy สำเร็จ) รันจากเครื่องคุณ:
 
 ```bash
+DATABASE_URL="postgresql://..." npx prisma db seed
+```
+
+5. เปิด URL ของ Vercel → login `admin` / รหัสที่ตั้งใน `SEED_ADMIN_PASSWORD`
+
+6. **Cron Jobs** ใน Vercel ต้องเปิดใช้ (Pro หรือตามแผน) — `vercel.json` ตั้ง schedule แล้ว
+
+---
+
+## พัฒนาในเครื่อง
+
+```bash
+cp .env.example .env
+# ใส่ DATABASE_URL จาก Supabase
+
 npm install
-npx prisma migrate dev
+npx prisma migrate deploy
 npx prisma db seed
 npm run dev
 ```
 
-เปิด http://localhost:3000 → login **admin** / **1234**
+เปิด http://localhost:3000
 
-## ขั้นตอนใช้งานจริง (ทั้งงวด)
+---
 
-1. **แดชบอร์ด** — ดูยอดรับวันนี้ / เลขเด่น
-2. **คีย์หวย** — คัดลอกข้อความจาก LINE มาวางเท่านั้น → บันทึก (iPad/คอม 3–4 เครื่อง)
-3. **ตั้งค่า** — เรทจ่าย 7 แบบ · จำกัดชุดต่อเลข (เช่น ไม่เกิน 10 ชุด)
-4. **ออกผล** — ใส่เลข 4 หลักที่ออกด้วยมือ → ตรวจถูก + สรุปยอดจ่าย/กำไร
-5. **งวดใหม่** — ปิดงวดเก่า เริ่มรับโพยรอบใหม่
+## คำสั่ง
 
-## บัญชีทดลอง
+| คำสั่ง | ใช้เมื่อ |
+|--------|---------|
+| `npm run dev` | พัฒนา |
+| `npm run build` | build + migrate (production) |
+| `npm run db:backup` | สำรอง JSON ใน `backups/` |
+| `npm run db:seed` | สร้างบ้าน + admin + staff |
 
-| ผู้ใช้ | รหัสผ่าน |
-|--------|----------|
-| admin | 1234 |
-| staff1–3 | 1234 |
+---
 
-## เรทจ่ายเริ่มต้น (ต่อ 1 ชุด)
+## บัญชีเริ่มต้น (หลัง seed)
 
-4 ตรง 120,000 · 4 โต๊ด 4,000 · 3 ตรง 35,000 · 3 โต๊ด 3,000 · 3 หน้า 2,000 · 2 หน้า/หลัง 1,500
+| ผู้ใช้ | บทบาท |
+|--------|--------|
+| `admin` | เจ้ามือ |
+| `staff1`–`staff3` | ลูกมือ |
 
-แก้ได้ที่เมนู **ตั้งค่า** (admin)
+เปลี่ยนรหัสทันทีหลังส่งมอบลูกค้า
 
-## Production
+---
 
-```bash
-# .env
-DATABASE_URL="file:./prod.db"
-SESSION_SECRET="random-long-secret"
+## ส่งมอบลูกค้า
 
-npx prisma migrate deploy
-npx prisma db seed
-npm run build && npm start
-```
+- URL เว็บ · บัญชี admin · ลิงก์ **วิธีใช้** (`/guide`)
+- บอก: โพยจากรูปให้ตรวจก่อนบันทึก · คัดลอกข้อความ LINE แม่นสุด
+- ราคาต่อชุด (ยอดรับ) ตั้งที่ **ตั้งค่า**
