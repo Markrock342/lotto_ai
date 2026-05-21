@@ -58,11 +58,18 @@ export async function POST(request: Request) {
       );
     }
 
+    const sourceLabel =
+      source === "gemini"
+        ? "Gemini"
+        : source === "openai"
+          ? "OpenAI"
+          : "OpenRouter";
+
     return NextResponse.json({
       text,
       lineCount,
       source,
-      message: `อ่านได้ ${lineCount} เลข (AI) — ตรวจก่อนบันทึก`,
+      message: `อ่านได้ ${lineCount} เลข (${sourceLabel}) — ตรวจก่อนบันทึก`,
     });
   } catch (e) {
     console.error("vision ocr:", e);
