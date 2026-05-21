@@ -43,9 +43,9 @@ Backup อัตโนมัติ:
 | `SEED_ADMIN_PASSWORD` | รหัสเจ้ามือ (ตั้งครั้งแรกเท่านั้น) |
 | `SEED_STAFF_PASSWORD` | รหัสลูกมือ |
 
-3. Deploy — build จะรัน `prisma migrate deploy` สร้างตารางอัตโนมัติ
+3. Deploy — build รัน `prisma generate && next build` (migrate รันจากเครื่องคุณ ไม่รันบน Vercel — กัน pool เต็ม)
 
-4. **Seed ครั้งแรก** (หลัง deploy สำเร็จ) รันจากเครื่องคุณ:
+4. **Migrate + seed ครั้งแรก** (จากเครื่องคุณ):
 
 ```bash
 DATABASE_URL="postgresql://..." npx prisma db seed

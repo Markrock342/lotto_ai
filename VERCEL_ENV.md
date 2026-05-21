@@ -6,7 +6,7 @@
 
 | ตัวแปร | ค่า | หมายเหตุ |
 |--------|-----|----------|
-| `DATABASE_URL` | URI จาก Supabase → **Connect → Session pooler (port 5432)** | โปรเจกต์ใช้ Prisma — **อย่าใช้ Transaction 6543** (ค้าง/ล้ม) |
+| `DATABASE_URL` | URI จาก Supabase → **Connect → Session pooler (port 5432)** | โปรเจกต์ใช้ Prisma — **อย่าใช้ Transaction 6543** (ค้าง/ล้ม). แนะนำต่อท้าย `?connection_limit=1` บน Vercel |
 | `SESSION_SECRET` | `openssl rand -hex 32` | คนละค่ากับเครื่อง dev ได้ |
 | `SUPABASE_URL` | `https://yfthcrbsexjnvrrfifkw.supabase.co` | backup cron |
 
@@ -41,9 +41,17 @@
 
 ## หลังใส่ env
 
-1. **Redeploy** (Deployments → … → Redeploy) — build รัน `prisma migrate deploy` (ข้ามได้ถ้ามี `_prisma_migrations` จาก SQL แล้ว)
-2. เปิด URL → login `admin` / `Admin@2026` (จาก SQL seed)
-3. เปลี่ยนรหัส admin/staff ก่อนส่งลูกค้า
+1. **Redeploy** — build บน Vercel **ไม่รัน** `migrate deploy` (กัน DB เต็ม `max clients 15`)
+2. อัปเดต schema ครั้งเดียวจาก Mac: `DATABASE_URL="..." npx prisma migrate deploy`
+3. เปิด URL → login `admin` / `Admin@2026` (จาก SQL seed)
+4. เปลี่ยนรหัส admin/staff ก่อนส่งลูกค้า
+
+## Deploy error `max clients reached` (EMAXCONNSESSION)
+
+- Supabase Session pooler จำกัด **15 connection**
+- สาเหตุ: `npm run dev` local + deploy ซ้ำๆ + migrate ตอน build
+- แก้: **หยุด dev server** ชั่วคราว → รอ 1–2 นาที → Redeploy
+- ถ้ายังไม่ได้: Supabase Dashboard → Database → restart หรือลด connection อื่น
 
 ## ความปลอดภัย
 
