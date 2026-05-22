@@ -63,6 +63,8 @@ export default function KeyPage() {
   const [canEditLimits, setCanEditLimits] = useState(false);
   const [pricePerSet, setPricePerSet] = useState<number | null>(null);
   const [customerList, setCustomerList] = useState<string[]>([]);
+  const [newCustomerName, setNewCustomerName] = useState("");
+  const [canEditSettings, setCanEditSettings] = useState(false);
   const [summarySortKey, setSummarySortKey] = useState<SummarySortKey>("totalAmount");
   const [summarySortDir, setSummarySortDir] = useState<SortDir>("desc");
   const [selectedNumbers, setSelectedNumbers] = useState<Set<string>>(new Set());
@@ -103,6 +105,11 @@ export default function KeyPage() {
         });
         setPricePerSet(house.pricePerSet);
         setCustomerList(Array.isArray(house.customerList) ? house.customerList : []);
+        const meRes = await fetch("/api/me");
+        if (meRes.ok) {
+          const { permissions } = await meRes.json();
+          setCanEditSettings(permissions.includes("settings:write"));
+        }
       }
     }
   }, []);
@@ -360,28 +367,91 @@ export default function KeyPage() {
           แยกบิลตามชื่อ: ใส่บรรทัดหัวข้อ เช่น <span className="font-mono">#สมชาย</span> หรือ{" "}
           <span className="font-mono">ลูกค้า: น้องหมิว</span> ก่อนเลขแต่ละกลุ่ม
         </p>
-        {customerList.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2">
+        {/* Customer quick-select */}
+        <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 dark:border-slate-700 dark:bg-slate-800/50">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">เลือกลูกค้า</span>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
             {customerList.map((name) => (
-              <button
+              <span
                 key={name}
-                type="button"
-                disabled={drawClosed}
-                onClick={() => {
-                  setRawText((prev) => {
-                    const prefix = `#${name}\n`;
-                    if (!prev.trim()) return prefix;
-                    if (prev.endsWith(prefix)) return prev;
-                    return prev.trimEnd() + `\n\n#${name}\n`;
+                className="group flex items-center gap-1 rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800 dark:bg-amber-900/40 dark:text-amber-300"
+              >
+                <button
+                  type="button"
+                  disabled={drawClosed}
+                  onClick={() => {
+                    setRawText((prev) => {
+                      const prefix = `#${name}\n`;
+                      if (!prev.trim()) return prefix;
+                      if (prev.endsWith(prefix)) return prev;
+                      return prev.trimEnd() + `\n\n#${name}\n`;
+                    });
+                  }}
+                  className="disabled:opacity-40"
+                >
+                  #{name}
+                </button>
+                {canEditSettings && (
+                  <button
+                    type="button"
+                    aria-label={`ลบ ${name}`}
+                    onClick={async () => {
+                      const next = customerList.filter((n) => n !== name);
+                      setCustomerList(next);
+                      await fetch("/api/settings", {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ customerList: next }),
+                      });
+                    }}
+                    className="ml-0.5 text-blue-400 hover:text-red-500 dark:text-amber-500 dark:hover:text-red-400"
+                  >
+                    ×
+                  </button>
+                )}
+              </span>
+            ))}
+            {canEditSettings && (
+              <form
+                className="flex items-center gap-1"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const trimmed = newCustomerName.trim();
+                  if (!trimmed || customerList.includes(trimmed)) {
+                    setNewCustomerName("");
+                    return;
+                  }
+                  const next = [...customerList, trimmed];
+                  setCustomerList(next);
+                  setNewCustomerName("");
+                  await fetch("/api/settings", {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ customerList: next }),
                   });
                 }}
-                className="rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800 hover:bg-blue-200 dark:bg-amber-900/40 dark:text-amber-300 dark:hover:bg-amber-800/60 disabled:opacity-40"
               >
-                #{name}
-              </button>
-            ))}
+                <input
+                  value={newCustomerName}
+                  onChange={(e) => setNewCustomerName(e.target.value)}
+                  placeholder="+ เพิ่มชื่อ..."
+                  className="w-28 rounded-full border border-slate-300 bg-white px-3 py-1 text-xs dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+                />
+                <button
+                  type="submit"
+                  className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300"
+                >
+                  บันทึก
+                </button>
+              </form>
+            )}
+            {customerList.length === 0 && !canEditSettings && (
+              <span className="text-xs text-slate-400">ยังไม่มีรายชื่อ — เพิ่มได้ที่หน้าตั้งค่า</span>
+            )}
           </div>
-        )}
+        </div>
         <textarea
           value={rawText}
           onChange={(e) => setRawText(e.target.value)}
