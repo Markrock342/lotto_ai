@@ -4,7 +4,7 @@ const NUMBER_RE = /^\d{2,4}$/;
 const AMOUNT_RE = /^\d+(?:\.\d+)?$/;
 const META_LINE_RE =
   /ชุด|โอน|จ่าย|สต|เพจ|น้อง|แล้ว|ห้อง|ลาว|#\d/i;
-const SET_COUNT_RE = /(?:^|[=\s#])(\d+)\s*ชุด/i;
+const SET_COUNT_RE = /^[=\*xX]\s*(\d+)\s*(?:ชุด)?$/i;
 const FOUR_DIGIT_RE = /\b(\d{4})\b/g;
 /** 2355=1ชุด หรือ 2355=1 */
 const NUMBER_SETS_LINE_RE = /^(\d{2,4})\s*=\s*(\d+)\s*(?:ชุด)?\s*$/i;
