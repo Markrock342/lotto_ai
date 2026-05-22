@@ -82,43 +82,47 @@ export default function KeyPage() {
     }, 0);
   }, [previewResult]);
 
+  const loadStaticData = useCallback(async () => {
+    const settingsRes = await fetch("/api/settings");
+    if (settingsRes.ok) {
+      const { house } = await settingsRes.json();
+      const limRes = await fetch("/api/limits");
+      const perNumber: RiskLimitsConfig["perNumber"] = {};
+      if (limRes.ok) {
+        const { limits } = await limRes.json();
+        for (const l of limits) {
+          perNumber[l.number] = { maxRisk: l.maxRisk, maxSets: l.maxSets };
+        }
+      }
+      setLimitsConfig({
+        defaultMaxRisk: house.defaultMaxRisk,
+        defaultMaxSets: house.defaultMaxSets,
+        perNumber,
+      });
+      setPricePerSet(house.pricePerSet);
+      setCustomerList(Array.isArray(house.customerList) ? house.customerList : []);
+      const meRes = await fetch("/api/me");
+      if (meRes.ok) {
+        const { permissions } = await meRes.json();
+        setCanEditSettings(permissions.includes("settings:write"));
+      }
+    }
+  }, []);
+
   const loadSummary = useCallback(async () => {
     const res = await fetch("/api/summary");
     if (res.ok) {
       const data = (await res.json()) as SummaryResponse;
       setSummary(data);
-      const settingsRes = await fetch("/api/settings");
-      if (settingsRes.ok) {
-        const { house } = await settingsRes.json();
-        const limRes = await fetch("/api/limits");
-        const perNumber: RiskLimitsConfig["perNumber"] = {};
-        if (limRes.ok) {
-          const { limits } = await limRes.json();
-          for (const l of limits) {
-            perNumber[l.number] = { maxRisk: l.maxRisk, maxSets: l.maxSets };
-          }
-        }
-        setLimitsConfig({
-          defaultMaxRisk: house.defaultMaxRisk,
-          defaultMaxSets: house.defaultMaxSets,
-          perNumber,
-        });
-        setPricePerSet(house.pricePerSet);
-        setCustomerList(Array.isArray(house.customerList) ? house.customerList : []);
-        const meRes = await fetch("/api/me");
-        if (meRes.ok) {
-          const { permissions } = await meRes.json();
-          setCanEditSettings(permissions.includes("settings:write"));
-        }
-      }
     }
   }, []);
 
   useEffect(() => {
+    void loadStaticData();
     void loadSummary();
     const t = setInterval(() => void loadSummary(), 4000);
     return () => clearInterval(t);
-  }, [loadSummary]);
+  }, [loadStaticData, loadSummary]);
 
   useEffect(() => {
     void (async () => {
