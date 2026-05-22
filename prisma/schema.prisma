@@ -14,8 +14,9 @@ model House {
   pricePerSet    Int      @default(120)
   defaultMaxRisk Int?
   defaultMaxSets Int?
-  ratesJson      String
-  createdAt      DateTime @default(now())
+  ratesJson          String
+  customerListJson   String   @default("[]")
+  createdAt          DateTime @default(now())
   users          User[]
   draws          Draw[]
   numberLimits   NumberLimit[]

@@ -9,10 +9,18 @@ export type HouseConfig = {
   defaultMaxRisk: number | null;
   defaultMaxSets: number | null;
   rates: PayoutRates;
+  customerList: string[];
 };
 
 export async function getHouseConfig(houseId: string): Promise<HouseConfig> {
   const house = await prisma.house.findUniqueOrThrow({ where: { id: houseId } });
+  let customerList: string[] = [];
+  try {
+    const parsed = JSON.parse(house.customerListJson || "[]");
+    if (Array.isArray(parsed)) customerList = parsed.filter((x): x is string => typeof x === "string");
+  } catch {
+    customerList = [];
+  }
   return {
     id: house.id,
     name: house.name,
@@ -20,6 +28,7 @@ export async function getHouseConfig(houseId: string): Promise<HouseConfig> {
     defaultMaxRisk: house.defaultMaxRisk,
     defaultMaxSets: house.defaultMaxSets,
     rates: parseRatesJson(house.ratesJson),
+    customerList,
   };
 }
 

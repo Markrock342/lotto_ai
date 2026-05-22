@@ -23,6 +23,7 @@ export async function PATCH(request: Request) {
     defaultMaxRisk?: number | null;
     defaultMaxSets?: number | null;
     rates?: PayoutRates;
+    customerList?: string[];
   };
 
   const current = await getHouseConfig(session.houseId);
@@ -40,6 +41,9 @@ export async function PATCH(request: Request) {
       defaultMaxSets:
         body.defaultMaxSets !== undefined ? body.defaultMaxSets : undefined,
       ratesJson: body.rates ? serializeRates(body.rates) : undefined,
+      customerListJson: body.customerList !== undefined
+        ? JSON.stringify(body.customerList.filter((n) => typeof n === "string" && n.trim()))
+        : undefined,
     },
   });
 

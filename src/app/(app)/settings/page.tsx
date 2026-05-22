@@ -11,6 +11,7 @@ type HouseData = {
   defaultMaxRisk: number | null;
   defaultMaxSets: number | null;
   rates: PayoutRates;
+  customerList: string[];
 };
 
 export default function SettingsPage() {
@@ -19,6 +20,8 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [defaultMaxRisk, setDefaultMaxRisk] = useState("");
   const [defaultMaxSets, setDefaultMaxSets] = useState("");
+  const [customerList, setCustomerList] = useState<string[]>([]);
+  const [newCustomerName, setNewCustomerName] = useState("");
   const [pw, setPw] = useState({
     current: "",
     next: "",
@@ -42,6 +45,7 @@ export default function SettingsPage() {
         setHouse(h);
         setDefaultMaxRisk(h.defaultMaxRisk != null ? String(h.defaultMaxRisk) : "");
         setDefaultMaxSets(h.defaultMaxSets != null ? String(h.defaultMaxSets) : "");
+        setCustomerList(Array.isArray(h.customerList) ? h.customerList : []);
       }
     })();
   }, []);
@@ -87,6 +91,7 @@ export default function SettingsPage() {
         rates: house.rates,
         defaultMaxRisk: defaultMaxRisk.trim() ? Number(defaultMaxRisk) : null,
         defaultMaxSets: defaultMaxSets.trim() ? Number(defaultMaxSets) : null,
+        customerList,
       }),
     });
     if (res.ok) {
@@ -178,6 +183,67 @@ export default function SettingsPage() {
           {saved ? "บันทึกแล้ว ✓" : "บันทึกการตั้งค่า"}
         </button>
       )}
+
+      <section className={`mt-4 ${ui.cardPad}`}>
+        <h2 className="text-sm font-bold text-blue-700 dark:text-amber-300">รายชื่อลูกค้าประจำ</h2>
+        <p className="mt-1 text-xs text-slate-500">ใช้เพื่อแสดงปุ่มเลือกด่วนในหน้าคีย์หวย</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {customerList.map((name) => (
+            <span
+              key={name}
+              className="flex items-center gap-1 rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800 dark:bg-amber-900/40 dark:text-amber-300"
+            >
+              #{name}
+              {canEditSettings && (
+                <button
+                  type="button"
+                  aria-label={`ลบ ${name}`}
+                  onClick={() => setCustomerList((prev) => prev.filter((n) => n !== name))}
+                  className="ml-1 rounded-full text-blue-500 hover:text-red-500 dark:text-amber-400 dark:hover:text-red-400"
+                >
+                  ✕
+                </button>
+              )}
+            </span>
+          ))}
+          {customerList.length === 0 && (
+            <p className="text-xs text-slate-400">ยังไม่มีรายชื่อ</p>
+          )}
+        </div>
+        {canEditSettings && (
+          <div className="mt-3 flex gap-2">
+            <input
+              value={newCustomerName}
+              onChange={(e) => setNewCustomerName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  const trimmed = newCustomerName.trim();
+                  if (trimmed && !customerList.includes(trimmed)) {
+                    setCustomerList((prev) => [...prev, trimmed]);
+                  }
+                  setNewCustomerName("");
+                }
+              }}
+              placeholder="ชื่อลูกค้า..."
+              className={`${ui.inputSm} flex-1`}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                const trimmed = newCustomerName.trim();
+                if (trimmed && !customerList.includes(trimmed)) {
+                  setCustomerList((prev) => [...prev, trimmed]);
+                }
+                setNewCustomerName("");
+              }}
+              className={ui.btnGhost}
+            >
+              เพิ่ม
+            </button>
+          </div>
+        )}
+      </section>
 
       <section className={`mt-6 ${ui.cardPad}`}>
         <h2 className="text-sm font-bold text-blue-700 dark:text-amber-300">เปลี่ยนรหัสผ่าน</h2>

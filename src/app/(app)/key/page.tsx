@@ -62,6 +62,7 @@ export default function KeyPage() {
   const [reloadBets, setReloadBets] = useState(0);
   const [canEditLimits, setCanEditLimits] = useState(false);
   const [pricePerSet, setPricePerSet] = useState<number | null>(null);
+  const [customerList, setCustomerList] = useState<string[]>([]);
   const [summarySortKey, setSummarySortKey] = useState<SummarySortKey>("totalAmount");
   const [summarySortDir, setSummarySortDir] = useState<SortDir>("desc");
   const [selectedNumbers, setSelectedNumbers] = useState<Set<string>>(new Set());
@@ -101,6 +102,7 @@ export default function KeyPage() {
           perNumber,
         });
         setPricePerSet(house.pricePerSet);
+        setCustomerList(Array.isArray(house.customerList) ? house.customerList : []);
       }
     }
   }, []);
@@ -358,6 +360,28 @@ export default function KeyPage() {
           แยกบิลตามชื่อ: ใส่บรรทัดหัวข้อ เช่น <span className="font-mono">#สมชาย</span> หรือ{" "}
           <span className="font-mono">ลูกค้า: น้องหมิว</span> ก่อนเลขแต่ละกลุ่ม
         </p>
+        {customerList.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {customerList.map((name) => (
+              <button
+                key={name}
+                type="button"
+                disabled={drawClosed}
+                onClick={() => {
+                  setRawText((prev) => {
+                    const prefix = `#${name}\n`;
+                    if (!prev.trim()) return prefix;
+                    if (prev.endsWith(prefix)) return prev;
+                    return prev.trimEnd() + `\n\n#${name}\n`;
+                  });
+                }}
+                className="rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800 hover:bg-blue-200 dark:bg-amber-900/40 dark:text-amber-300 dark:hover:bg-amber-800/60 disabled:opacity-40"
+              >
+                #{name}
+              </button>
+            ))}
+          </div>
+        )}
         <textarea
           value={rawText}
           onChange={(e) => setRawText(e.target.value)}
