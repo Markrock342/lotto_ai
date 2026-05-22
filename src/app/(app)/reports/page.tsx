@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import { PageHeader, StatBox, ui } from "@/components/ui";
 import { PeriodFilter } from "@/components/period-filter";
 import type { ReportPeriod } from "@/lib/date-period";
@@ -34,6 +34,7 @@ export default function ReportsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [bets, setBets] = useState<BetRow[]>([]);
   const [showCancelled, setShowCancelled] = useState(false);
+  const [summaryMode, setSummaryMode] = useState("เต็ม");
   const [msg, setMsg] = useState("");
   const [slips, setSlips] = useState<
     { id: string; customerName: string | null; betCount: number }[]
@@ -99,6 +100,30 @@ export default function ReportsPage() {
   const selected = draws.find((d) => d.id === selectedId);
   const settled = draws.filter((d) => d.status === "settled");
   const totalProfit = settled.reduce((s, d) => s + d.profit, 0);
+
+  const betSummary = useMemo(() => {
+    if (!bets) return [];
+    const activeBets = bets.filter((b) => b.status !== "cancelled");
+    const map = new Map<string, { count: number; amount: number }>();
+
+    for (const b of activeBets) {
+      if (summaryMode === "3 ตัวท้าย" && b.number.length < 3) continue;
+      if (summaryMode === "2 ตัวท้าย" && b.number.length < 2) continue;
+
+      let key = b.number;
+      if (summaryMode === "3 ตัวท้าย") key = key.slice(-3);
+      else if (summaryMode === "2 ตัวท้าย") key = key.slice(-2);
+
+      const existing = map.get(key) || { count: 0, amount: 0 };
+      existing.count += 1;
+      existing.amount += b.amount;
+      map.set(key, existing);
+    }
+
+    return Array.from(map.entries())
+      .map(([number, data]) => ({ number, ...data }))
+      .sort((a, b) => b.amount - a.amount);
+  }, [bets, summaryMode]);
 
   function openPrint() {
     if (!selectedId) return;
@@ -303,6 +328,62 @@ export default function ReportsPage() {
               </tbody>
             </table>
           </div>
+        </section>
+      )}
+
+      {selected && (
+        <section className={`mt-4 ${ui.cardPad}`}>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-bold">
+              สรุปยอดรับแยกตามเลข
+            </h2>
+            <div className="flex rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
+              {["เต็ม", "3 ตัวท้าย", "2 ตัวท้าย"].map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setSummaryMode(m)}
+                  className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                    summaryMode === m
+                      ? "bg-white text-blue-700 shadow-sm dark:bg-slate-700 dark:text-amber-300"
+                      : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
+                  }`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          </div>
+          {betSummary.length === 0 ? (
+            <p className="mt-4 text-sm text-slate-500">ไม่มีข้อมูลเลขในหมวดหมู่นี้</p>
+          ) : (
+            <div className="mt-3 max-h-[40vh] overflow-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr>
+                    <th className={ui.th}>เลข</th>
+                    <th className={`${ui.th} text-right`}>จำนวนรายการ</th>
+                    <th className={`${ui.th} text-right`}>ยอดรับรวม</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {betSummary.map((s) => (
+                    <tr key={s.number} className="hover:bg-blue-50 dark:hover:bg-slate-800">
+                      <td className={`${ui.td} font-mono font-bold text-slate-900 dark:text-amber-200`}>
+                        {s.number}
+                      </td>
+                      <td className={`${ui.td} text-right text-slate-600 dark:text-slate-400`}>
+                        {s.count} รายการ
+                      </td>
+                      <td className={`${ui.td} text-right font-bold text-blue-700 dark:text-amber-400`}>
+                        ฿{s.amount.toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
       )}
 
