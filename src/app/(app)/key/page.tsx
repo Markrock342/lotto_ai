@@ -9,6 +9,7 @@ import { PageHeader, StatBox, ui } from "@/components/ui";
 import { formatBillText } from "@/lib/format-bill";
 import type { NumberSummaryWithLimit, RiskLimitsConfig } from "@/lib/limits";
 import { getCapForNumber } from "@/lib/limits";
+import { parseSlipText } from "@/lib/parse-slip";
 import {
   compareNumbers,
   compareStrings,
@@ -65,6 +66,18 @@ export default function KeyPage() {
   const [summarySortDir, setSummarySortDir] = useState<SortDir>("desc");
   const [selectedNumbers, setSelectedNumbers] = useState<Set<string>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
+
+  const previewResult = useMemo(() => {
+    if (!rawText.trim() || pricePerSet == null) return null;
+    return parseSlipText(rawText, pricePerSet);
+  }, [rawText, pricePerSet]);
+
+  const previewTotal = useMemo(() => {
+    if (!previewResult) return 0;
+    return previewResult.sections.reduce((sum, s) => {
+      return sum + s.entries.reduce((s2, e) => s2 + e.amount, 0);
+    }, 0);
+  }, [previewResult]);
 
   const loadSummary = useCallback(async () => {
     const res = await fetch("/api/summary");
@@ -353,6 +366,18 @@ export default function KeyPage() {
           placeholder={"#ลูกค้า A\n1234 5678\n\n#ลูกค้า B\n9012=2ชุด"}
           className={`${ui.input} mt-2 min-h-[200px] resize-y font-mono disabled:opacity-50`}
         />
+        {previewResult && previewTotal > 0 && (
+          <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-200">
+            <div className="flex items-center justify-between font-bold">
+              <span>ยอดรวมที่จะบันทึก:</span>
+              <span className="text-xl text-blue-700 dark:text-amber-300">฿{previewTotal.toLocaleString()}</span>
+            </div>
+            <div className="mt-1 flex items-center justify-between text-xs opacity-80">
+              <span>จำนวนโพย: {previewResult.sections.reduce((c, s) => c + s.entries.length, 0)} รายการ</span>
+              {previewResult.sections.length > 1 && <span>แยกเป็น {previewResult.sections.length} บิล</span>}
+            </div>
+          </div>
+        )}
         <div className="mt-4 flex flex-wrap gap-2">
           <button
             type="button"
