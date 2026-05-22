@@ -185,9 +185,9 @@ function configuredProvider(): VisionOcrSource | null {
   if (prefer === "openai" && process.env.OPENAI_API_KEY?.trim()) {
     return "openai";
   }
-  if (process.env.OPENROUTER_API_KEY?.trim()) return "openrouter";
-  if (process.env.OPENAI_API_KEY?.trim()) return "openai";
   if (process.env.GEMINI_API_KEY?.trim()) return "gemini";
+  if (process.env.OPENAI_API_KEY?.trim()) return "openai";
+  if (process.env.OPENROUTER_API_KEY?.trim()) return "openrouter";
   return null;
 }
 
@@ -226,24 +226,32 @@ export async function recognizeSlipWithVision(
     return tryOpenAi();
   }
 
-  if (process.env.OPENROUTER_API_KEY) {
-    return tryOpenRouter();
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      return await tryGemini();
+    } catch (e) {
+      if (process.env.OPENAI_API_KEY) {
+        console.warn("Gemini OCR failed, trying OpenAI:", e);
+        return tryOpenAi();
+      }
+      throw e;
+    }
   }
 
   if (process.env.OPENAI_API_KEY) {
     try {
       return await tryOpenAi();
     } catch (e) {
-      if (process.env.GEMINI_API_KEY) {
-        console.warn("OpenAI OCR failed, trying Gemini:", e);
-        return tryGemini();
+      if (process.env.OPENROUTER_API_KEY) {
+        console.warn("OpenAI OCR failed, trying OpenRouter:", e);
+        return tryOpenRouter();
       }
       throw e;
     }
   }
 
-  if (process.env.GEMINI_API_KEY) {
-    return tryGemini();
+  if (process.env.OPENROUTER_API_KEY) {
+    return tryOpenRouter();
   }
 
   throw new Error("No vision API key configured");
