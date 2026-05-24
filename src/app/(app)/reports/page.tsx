@@ -109,10 +109,12 @@ export default function ReportsPage() {
     for (const b of activeBets) {
       if (summaryMode === "3 ตัวท้าย" && b.number.length < 3) continue;
       if (summaryMode === "2 ตัวท้าย" && b.number.length < 2) continue;
+      if (summaryMode === "2 ตัวหน้า" && b.number.length < 2) continue;
 
       let key = b.number;
       if (summaryMode === "3 ตัวท้าย") key = key.slice(-3);
       else if (summaryMode === "2 ตัวท้าย") key = key.slice(-2);
+      else if (summaryMode === "2 ตัวหน้า") key = key.slice(0, 2);
 
       const existing = map.get(key) || { count: 0, amount: 0 };
       existing.count += 1;
@@ -338,7 +340,7 @@ export default function ReportsPage() {
               สรุปยอดรับแยกตามเลข
             </h2>
             <div className="flex rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
-              {["เต็ม", "3 ตัวท้าย", "2 ตัวท้าย"].map((m) => (
+              {["เต็ม", "3 ตัวท้าย", "2 ตัวท้าย", "2 ตัวหน้า"].map((m) => (
                 <button
                   key={m}
                   type="button"
