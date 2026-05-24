@@ -144,8 +144,7 @@ export default function ReportsPage() {
     // ประเภทที่ต้องการแสดง: key => { label, extractor(num4) }
     const categories: { key: string; label: string; extract: (n: string) => string }[] = [
       { key: "fourStraight", label: "4 ตัวตรง", extract: (n) => n },
-      { key: "threeStraight", label: "3 ตัวตรง (3 ท้าย)", extract: (n) => n.slice(-3) },
-      { key: "threeFront", label: "3 ตัวหน้า", extract: (n) => n.slice(0, 3) },
+      { key: "threeStraight", label: "3 ตัวตรง", extract: (n) => n.slice(-3) },
       { key: "twoFront", label: "2 ตัวหน้า", extract: (n) => n.slice(0, 2) },
       { key: "twoBack", label: "2 ตัวหลัง", extract: (n) => n.slice(-2) },
     ];
@@ -416,7 +415,6 @@ export default function ReportsPage() {
               const winDigit =
                 cat.key === "fourStraight" ? resultDigits?.full
                 : cat.key === "threeStraight" ? resultDigits?.back3
-                : cat.key === "threeFront" ? resultDigits?.front3
                 : cat.key === "twoFront" ? resultDigits?.front2
                 : cat.key === "twoBack" ? resultDigits?.back2
                 : undefined;
