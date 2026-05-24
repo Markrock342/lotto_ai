@@ -34,7 +34,7 @@ export default function ReportsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [bets, setBets] = useState<BetRow[]>([]);
   const [showCancelled, setShowCancelled] = useState(false);
-  const [summaryMode, setSummaryMode] = useState("เต็ม");
+  const [summaryMode, setSummaryMode] = useState<string>("4 ตัวตรง");
   const [msg, setMsg] = useState("");
   const [slips, setSlips] = useState<
     { id: string; customerName: string | null; betCount: number }[]
@@ -346,7 +346,7 @@ export default function ReportsPage() {
               สรุปยอดรับแยกตามเลข
             </h2>
             <div className="flex flex-wrap gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
-              {["เต็ม", "4 ตัวโต๊ด", "3 ตัวโต๊ด", "3 ตัวท้าย", "3 ตัวหน้า", "2 ตัวท้าย", "2 ตัวหน้า"].map((m) => (
+              {["4 ตัวตรง", "4 ตัวโต๊ด", "3 ตัวโต๊ด", "3 ตัวท้าย", "3 ตัวหน้า", "2 ตัวท้าย", "2 ตัวหน้า"].map((m) => (
                 <button
                   key={m}
                   type="button"
