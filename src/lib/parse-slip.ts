@@ -10,7 +10,7 @@ const DIGIT_RE = /\b(\d{2,4})\b/g;
 const NUMBER_SETS_LINE_RE = /^(\d{2,4})\s*(?:[=\*xX]\s*(\d+)|[\-\/]\s*(\d{1,2}))\s*(?:ชุด)?\s*$/i;
 
 function normalizeNumber(raw: string): string {
-  return raw.padStart(4, "0");
+  return raw;
 }
 
 function isNumberToken(token: string): boolean {

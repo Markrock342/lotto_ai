@@ -65,14 +65,20 @@ export type AggregatedNumber = {
   maxPayout: number;
 };
 
+function maxRiskForNumber(num: string, rates: PayoutRates): number {
+  if (num.length === 2) return Math.max(rates.twoFront, rates.twoBack);
+  if (num.length === 3) return Math.max(rates.threeStraight, rates.threeTod);
+  return Math.max(rates.fourStraight, rates.fourTod, rates.threeStraight, rates.threeTod, rates.twoFront, rates.twoBack);
+}
+
 export async function aggregateDraw(drawId: string, rates: PayoutRates) {
   const bets = await prisma.bet.findMany({
     where: { drawId, status: "active" },
   });
-  const perSet = maxRiskPerSet(rates);
   const map = new Map<string, AggregatedNumber>();
 
   for (const b of bets) {
+    const perSet = maxRiskForNumber(b.number, rates);
     const existing = map.get(b.number);
     if (existing) {
       existing.sets += 1;
