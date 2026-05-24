@@ -133,6 +133,53 @@ export default function ReportsPage() {
       .sort((a, b) => b.amount - a.amount);
   }, [bets, summaryMode]);
 
+  /** สรุปยอดทุกประเภทรางวัลพร้อมกัน */
+  const prizeCategorySummary = useMemo(() => {
+    const activeBets = bets.filter((b) => b.status !== "cancelled");
+    const pad4 = (n: string) => n.replace(/\D/g, "").padStart(4, "0").slice(-4);
+
+    // ประเภทที่ต้องการแสดง: key => { label, extractor(num4) }
+    const categories: { key: string; label: string; extract: (n: string) => string }[] = [
+      { key: "fourStraight", label: "4 ตัวตรง", extract: (n) => n },
+      { key: "threeStraight", label: "3 ตัวตรง (3 ท้าย)", extract: (n) => n.slice(-3) },
+      { key: "threeFront", label: "3 ตัวหน้า", extract: (n) => n.slice(0, 3) },
+      { key: "twoFront", label: "2 ตัวหน้า", extract: (n) => n.slice(0, 2) },
+      { key: "twoBack", label: "2 ตัวหลัง", extract: (n) => n.slice(-2) },
+    ];
+
+    return categories.map(({ key, label, extract }) => {
+      // นับชุดแยกตามเลข
+      const map = new Map<string, { sets: number; amount: number }>();
+      for (const b of activeBets) {
+        const num4 = pad4(b.number);
+        const digit = extract(num4);
+        const existing = map.get(digit) ?? { sets: 0, amount: 0 };
+        existing.sets += 1;
+        existing.amount += b.amount;
+        map.set(digit, existing);
+      }
+      const rows = Array.from(map.entries())
+        .map(([number, data]) => ({ number, ...data }))
+        .sort((a, b) => b.sets - a.sets);
+      const totalSets = rows.reduce((s, r) => s + r.sets, 0);
+      const uniqueNumbers = rows.length;
+      return { key, label, extract, rows, totalSets, uniqueNumbers };
+    });
+  }, [bets]);
+
+  /** เลขผลลัพธ์ ถ้าออกแล้ว */
+  const resultDigits = useMemo(() => {
+    if (!selected?.result4) return null;
+    const r = selected.result4.replace(/\D/g, "").padStart(4, "0").slice(-4);
+    return {
+      full: r,
+      back3: r.slice(-3),
+      front3: r.slice(0, 3),
+      front2: r.slice(0, 2),
+      back2: r.slice(-2),
+    };
+  }, [selected]);
+
   function openPrint() {
     if (!selectedId) return;
     window.open(`/reports/print?drawId=${selectedId}`, "_blank");
@@ -335,6 +382,99 @@ export default function ReportsPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </section>
+      )}
+
+      {selected && (
+        <section className={`mt-4 ${ui.cardPad}`}>
+          <h2 className="mb-3 text-sm font-bold">
+            สรุปยอดตามประเภทรางวัล
+            {resultDigits && (
+              <span className="ml-2 font-mono text-base font-extrabold text-emerald-600 dark:text-emerald-400">
+                ผล: {resultDigits.full}
+              </span>
+            )}
+          </h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {prizeCategorySummary.map((cat) => {
+              const winDigit =
+                cat.key === "fourStraight" ? resultDigits?.full
+                : cat.key === "threeStraight" ? resultDigits?.back3
+                : cat.key === "threeFront" ? resultDigits?.front3
+                : cat.key === "twoFront" ? resultDigits?.front2
+                : cat.key === "twoBack" ? resultDigits?.back2
+                : undefined;
+
+              const winRow = winDigit ? cat.rows.find((r) => r.number === winDigit) : undefined;
+
+              return (
+                <div
+                  key={cat.key}
+                  className={`rounded-xl border p-3 ${
+                    winRow
+                      ? "border-emerald-400 bg-emerald-50 dark:border-emerald-600 dark:bg-emerald-950/30"
+                      : "border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/40"
+                  }`}
+                >
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      {cat.label}
+                    </span>
+                    <div className="text-right">
+                      <span className="text-lg font-extrabold text-blue-700 dark:text-amber-300">
+                        {cat.uniqueNumbers}
+                      </span>
+                      <span className="ml-1 text-xs text-slate-500">เลข</span>
+                      <span className="ml-2 text-base font-bold text-slate-800 dark:text-slate-200">
+                        {cat.totalSets}
+                      </span>
+                      <span className="ml-1 text-xs text-slate-500">ชุด</span>
+                    </div>
+                  </div>
+                  {winRow && (
+                    <div className="mb-2 rounded-lg bg-emerald-100 px-3 py-1.5 dark:bg-emerald-900/50">
+                      <span className="text-xs text-emerald-700 dark:text-emerald-300">🎯 ถูกรางวัล: </span>
+                      <span className="font-mono font-bold text-emerald-800 dark:text-emerald-200">
+                        {winRow.number}
+                      </span>
+                      <span className="ml-2 text-xs text-emerald-700 dark:text-emerald-300">
+                        {winRow.sets} ชุด
+                      </span>
+                    </div>
+                  )}
+                  <div className="max-h-[150px] overflow-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr>
+                          <th className="py-1 text-left text-slate-500">เลข</th>
+                          <th className="py-1 text-right text-slate-500">ชุด</th>
+                          <th className="py-1 text-right text-slate-500">ยอดรับ</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {cat.rows.map((r) => (
+                          <tr
+                            key={r.number}
+                            className={`${
+                              r.number === winDigit
+                                ? "font-bold text-emerald-700 dark:text-emerald-300"
+                                : "text-slate-700 dark:text-slate-300"
+                            }`}
+                          >
+                            <td className="py-0.5 font-mono">
+                              {r.number === winDigit && "🎯 "}{r.number}
+                            </td>
+                            <td className="py-0.5 text-right">{r.sets}</td>
+                            <td className="py-0.5 text-right">{r.amount.toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </section>
       )}
