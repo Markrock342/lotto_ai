@@ -63,7 +63,7 @@ export default function ReportsPage() {
     void (async () => {
       const status = showCancelled ? "all" : "active";
       const res = await fetch(
-        `/api/bets?drawId=${selectedId}&status=${status}&period=${period}`,
+        `/api/bets?drawId=${selectedId}&status=${status}&period=${period}&limit=all`,
       );
       if (res.ok) {
         const { bets: b } = await res.json();

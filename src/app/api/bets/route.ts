@@ -28,6 +28,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const status = url.searchParams.get("status") ?? "active";
   const period = url.searchParams.get("period");
+  const limit = url.searchParams.get("limit");
   let createdAtFilter: { gte: Date; lte: Date } | undefined;
   if (period && period !== "all") {
     const { from, to } = getPeriodRange(period as ReportPeriod);
@@ -41,7 +42,7 @@ export async function GET(request: Request) {
       ...(createdAtFilter ? { createdAt: createdAtFilter } : {}),
     },
     orderBy: { createdAt: "desc" },
-    take: 500,
+    ...(limit === "all" ? {} : { take: 500 }),
     include: {
       createdBy: { select: { displayName: true, username: true } },
       slip: { select: { customerName: true } },
