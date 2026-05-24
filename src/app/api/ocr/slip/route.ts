@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error:
-          "ยังไม่ได้ตั้ง AI อ่านรูป — ใส่ OPENROUTER_API_KEY, OPENAI_API_KEY หรือ GEMINI_API_KEY",
+          "ยังไม่ได้ตั้ง AI อ่านรูป — ใส่ GEMINI_API_KEY ในการตั้งค่าระบบ",
       },
       { status: 503 },
     );
@@ -58,12 +58,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const sourceLabel =
-      source === "gemini"
-        ? "Gemini"
-        : source === "openai"
-          ? "OpenAI"
-          : "OpenRouter";
+    const sourceLabel = "Gemini";
 
     return NextResponse.json({
       text,
