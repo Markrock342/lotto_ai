@@ -59,16 +59,11 @@ export async function POST(request: Request) {
     );
   }
 
-  const allowedByLine = new Map<number, typeof allowed>();
-  for (const e of allowed) {
-    const list = allowedByLine.get(e.line) ?? [];
-    list.push(e);
-    allowedByLine.set(e.line, list);
-  }
+  const blockedNumbers = new Set(blocked.map((b) => b.number));
 
   const sectionAllowed = parsed.sections.map((section) => ({
     section,
-    entries: section.entries.flatMap((e) => allowedByLine.get(e.line) ?? []),
+    entries: section.entries.filter((e) => !blockedNumbers.has(e.number)),
   }));
 
   const toImport =
