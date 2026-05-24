@@ -29,6 +29,7 @@ type DashboardData = {
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     void load();
@@ -82,6 +83,8 @@ export default function DashboardPage() {
       draw.result4 ? `ผลออก: ${draw.result4}` : "ยังไม่ออกผล",
     ].filter(Boolean).join("\n");
     void navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   return (
@@ -94,9 +97,9 @@ export default function DashboardPage() {
         <button
           type="button"
           onClick={copyLineSummary}
-          className="flex items-center gap-1.5 rounded-xl border border-green-300 bg-green-50 px-4 py-2 text-sm font-semibold text-green-700 hover:bg-green-100 dark:border-green-700/50 dark:bg-green-950/40 dark:text-green-300"
+          className="flex items-center gap-1.5 rounded-xl border border-green-300 bg-green-50 px-4 py-2 text-sm font-semibold text-green-700 hover:bg-green-100 dark:border-green-700/50 dark:bg-green-950/40 dark:text-green-300 transition-colors"
         >
-          📋 คัดลอกสรุปยอด LINE
+          {copied ? "✅ คัดลอกแล้ว" : "📋 คัดลอกสรุปยอด LINE"}
         </button>
       </div>
 
