@@ -107,12 +107,18 @@ export default function ReportsPage() {
     const map = new Map<string, { count: number; amount: number }>();
 
     for (const b of activeBets) {
+      if (summaryMode === "4 ตัวโต๊ด" && b.number.length < 4) continue;
+      if (summaryMode === "3 ตัวโต๊ด" && b.number.length < 3) continue;
       if (summaryMode === "3 ตัวท้าย" && b.number.length < 3) continue;
+      if (summaryMode === "3 ตัวหน้า" && b.number.length < 3) continue;
       if (summaryMode === "2 ตัวท้าย" && b.number.length < 2) continue;
       if (summaryMode === "2 ตัวหน้า" && b.number.length < 2) continue;
 
       let key = b.number;
-      if (summaryMode === "3 ตัวท้าย") key = key.slice(-3);
+      if (summaryMode === "4 ตัวโต๊ด") key = key.slice(-4).split('').sort().join('');
+      else if (summaryMode === "3 ตัวโต๊ด") key = key.slice(-3).split('').sort().join('');
+      else if (summaryMode === "3 ตัวท้าย") key = key.slice(-3);
+      else if (summaryMode === "3 ตัวหน้า") key = key.slice(0, 3);
       else if (summaryMode === "2 ตัวท้าย") key = key.slice(-2);
       else if (summaryMode === "2 ตัวหน้า") key = key.slice(0, 2);
 
@@ -339,8 +345,8 @@ export default function ReportsPage() {
             <h2 className="text-sm font-bold">
               สรุปยอดรับแยกตามเลข
             </h2>
-            <div className="flex rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
-              {["เต็ม", "3 ตัวท้าย", "2 ตัวท้าย", "2 ตัวหน้า"].map((m) => (
+            <div className="flex flex-wrap gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
+              {["เต็ม", "4 ตัวโต๊ด", "3 ตัวโต๊ด", "3 ตัวท้าย", "3 ตัวหน้า", "2 ตัวท้าย", "2 ตัวหน้า"].map((m) => (
                 <button
                   key={m}
                   type="button"
