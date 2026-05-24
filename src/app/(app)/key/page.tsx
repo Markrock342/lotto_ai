@@ -157,7 +157,7 @@ export default function KeyPage() {
             ? ` · ${data.slips[0].customerName}`
             : "";
       setMessage(
-        `บันทึก ${data.added} รายการ` +
+        `บันทึก ${data.added} ชุด` +
           slipNote +
           (data.skipped > 0 ? ` · ข้าม ${data.skipped}` : ""),
       );
@@ -471,7 +471,7 @@ export default function KeyPage() {
               <span className="text-xl text-blue-700 dark:text-amber-300">฿{previewTotal.toLocaleString()}</span>
             </div>
             <div className="mt-1 flex items-center justify-between text-xs opacity-80">
-              <span>จำนวนโพย: {previewResult.sections.reduce((c, s) => c + s.entries.length, 0)} รายการ</span>
+              <span>จำนวน: {previewResult.sections.reduce((c, s) => c + s.entries.length, 0)} ชุด</span>
               {previewResult.sections.length > 1 && <span>แยกเป็น {previewResult.sections.length} บิล</span>}
             </div>
           </div>
