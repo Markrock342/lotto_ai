@@ -5,9 +5,9 @@ const AMOUNT_RE = /^\d+(?:\.\d+)?$/;
 const META_LINE_RE =
   /ชุด|โอน|จ่าย|สต|เพจ|น้อง|แล้ว|ห้อง|ลาว|#\d/i;
 const SET_COUNT_RE = /^[=\*xX]\s*(\d+)\s*(?:ชุด)?$/i;
-const FOUR_DIGIT_RE = /\b(\d{4})\b/g;
+const DIGIT_RE = /\b(\d{2,4})\b/g;
 /** 2355=1ชุด หรือ 2355x1 หรือ 2355 * 1 */
-const NUMBER_SETS_LINE_RE = /^(\d{2,4})\s*[=\*xX]\s*(\d+)\s*(?:ชุด)?\s*$/i;
+const NUMBER_SETS_LINE_RE = /^(\d{2,4})\s*(?:[=\*xX]\s*(\d+)|[\-\/]\s*(\d{1,2}))\s*(?:ชุด)?\s*$/i;
 
 function normalizeNumber(raw: string): string {
   return raw.padStart(4, "0");
@@ -44,14 +44,14 @@ function parseNumberSetsLine(
   const m = line.trim().match(NUMBER_SETS_LINE_RE);
   if (!m) return null;
   const number = normalizeNumber(m[1]);
-  const sets = parseInt(m[2], 10);
+  const sets = parseInt(m[2] || m[3], 10);
   if (sets <= 0 || Number.isNaN(sets)) return [];
   return expandSets({ number, amount: pricePerSet, line: lineNo }, sets, pricePerSet);
 }
 
 function tokenizeLine(line: string): string[] {
   return line
-    .replace(/[=\-xX*]/g, " ")
+    .replace(/[=\-xX*/]/g, " ")
     .replace(/[,，]/g, " ")
     .split(/\s+/)
     .map((t) => t.trim())
@@ -128,8 +128,8 @@ function parseLine(
   return { entries };
 }
 
-function extractFourDigitsFromLine(line: string): string[] {
-  const matches = line.match(FOUR_DIGIT_RE);
+function extractDigitsFromLine(line: string): string[] {
+  const matches = line.match(DIGIT_RE);
   if (!matches) return [];
   return matches.map((m) => normalizeNumber(m));
 }
@@ -139,9 +139,9 @@ function isLineOnlyNumbers(line: string): boolean {
   if (!trimmed) return false;
   if (NUMBER_SETS_LINE_RE.test(trimmed)) return false;
   if (META_LINE_RE.test(trimmed) && !/^\d/.test(trimmed)) return false;
-  const digits = extractFourDigitsFromLine(trimmed);
+  const digits = extractDigitsFromLine(trimmed);
   if (digits.length === 0) return false;
-  const withoutDigits = trimmed.replace(FOUR_DIGIT_RE, "").replace(/\s+/g, "");
+  const withoutDigits = trimmed.replace(DIGIT_RE, "").replace(/\s+/g, "");
   return withoutDigits.length === 0 || /^[#=\s]+$/.test(withoutDigits);
 }
 
@@ -186,7 +186,7 @@ function parseLineFormatBlock(
 
     if (isLineOnlyNumbers(line)) {
       numberLines.push({
-        nums: extractFourDigitsFromLine(line),
+        nums: extractDigitsFromLine(line),
         lineNo: lineNo,
       });
       continue;
@@ -309,7 +309,7 @@ function parseClassicLines(
 
     if (isLineOnlyNumbers(trimmed)) {
       const sets = declaredSets ?? 1;
-      for (const num of extractFourDigitsFromLine(trimmed)) {
+      for (const num of extractDigitsFromLine(trimmed)) {
         entries.push(
           ...expandSets({ number: num, amount: pricePerSet, line: lineNo }, sets, pricePerSet),
         );
