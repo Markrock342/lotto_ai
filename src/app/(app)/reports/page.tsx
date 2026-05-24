@@ -41,6 +41,9 @@ export default function ReportsPage() {
   >([]);
   const [billSlipId, setBillSlipId] = useState<string | "all">("all");
   const [settlement, setSettlement] = useState<DrawSettlement | null>(null);
+  const [searchPrize, setSearchPrize] = useState("");
+  const [searchSummary, setSearchSummary] = useState("");
+  const [searchBets, setSearchBets] = useState("");
 
   const loadDraws = useCallback(async () => {
     const res = await fetch(`/api/draws?period=${period}`);
@@ -388,16 +391,28 @@ export default function ReportsPage() {
 
       {selected && (
         <section className={`mt-4 ${ui.cardPad}`}>
-          <h2 className="mb-3 text-sm font-bold">
-            สรุปยอดตามประเภทรางวัล
-            {resultDigits && (
-              <span className="ml-2 font-mono text-base font-extrabold text-emerald-600 dark:text-emerald-400">
-                ผล: {resultDigits.full}
-              </span>
-            )}
-          </h2>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-bold">
+              สรุปยอดตามประเภทรางวัล
+              {resultDigits && (
+                <span className="ml-2 font-mono text-base font-extrabold text-emerald-600 dark:text-emerald-400">
+                  ผล: {resultDigits.full}
+                </span>
+              )}
+            </h2>
+            <input
+              type="text"
+              placeholder="🔍 ค้นหาเลข..."
+              value={searchPrize}
+              onChange={(e) => setSearchPrize(e.target.value)}
+              className="w-36 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm focus:border-blue-400 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+            />
+          </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {prizeCategorySummary.map((cat) => {
+              const filteredRows = searchPrize.trim()
+                ? cat.rows.filter((r) => r.number.includes(searchPrize.trim()))
+                : cat.rows;
               const winDigit =
                 cat.key === "fourStraight" ? resultDigits?.full
                 : cat.key === "threeStraight" ? resultDigits?.back3
@@ -407,6 +422,7 @@ export default function ReportsPage() {
                 : undefined;
 
               const winRow = winDigit ? cat.rows.find((r) => r.number === winDigit) : undefined;
+              const showWinBanner = winRow && (!searchPrize.trim() || winRow.number.includes(searchPrize.trim()));
 
               return (
                 <div
@@ -432,7 +448,7 @@ export default function ReportsPage() {
                       <span className="ml-1 text-xs text-slate-500">ชุด</span>
                     </div>
                   </div>
-                  {winRow && (
+                  {showWinBanner && (
                     <div className="mb-2 rounded-lg bg-emerald-100 px-3 py-1.5 dark:bg-emerald-900/50">
                       <span className="text-xs text-emerald-700 dark:text-emerald-300">🎯 ถูกรางวัล: </span>
                       <span className="font-mono font-bold text-emerald-800 dark:text-emerald-200">
@@ -453,7 +469,9 @@ export default function ReportsPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {cat.rows.map((r) => (
+                        {filteredRows.length === 0 ? (
+                          <tr><td colSpan={3} className="py-2 text-center text-slate-400">ไม่พบเลข "{searchPrize}"</td></tr>
+                        ) : filteredRows.map((r) => (
                           <tr
                             key={r.number}
                             className={`${
@@ -482,9 +500,16 @@ export default function ReportsPage() {
       {selected && (
         <section className={`mt-4 ${ui.cardPad}`}>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-bold">
-              สรุปยอดรับแยกตามเลข
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold">สรุปยอดรับแยกตามเลข</h2>
+              <input
+                type="text"
+                placeholder="🔍 ค้นหาเลข..."
+                value={searchSummary}
+                onChange={(e) => setSearchSummary(e.target.value)}
+                className="w-36 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm focus:border-blue-400 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+              />
+            </div>
             <div className="flex flex-wrap gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
               {["4 ตัวตรง", "4 ตัวโต๊ด", "3 ตัวโต๊ด", "3 ตัวท้าย", "3 ตัวหน้า", "2 ตัวท้าย", "2 ตัวหน้า"].map((m) => (
                 <button
@@ -515,7 +540,9 @@ export default function ReportsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {betSummary.map((s) => (
+                  {betSummary
+                    .filter((s) => !searchSummary.trim() || s.number.includes(searchSummary.trim()))
+                    .map((s) => (
                     <tr key={s.number} className="hover:bg-blue-50 dark:hover:bg-slate-800">
                       <td className={`${ui.td} font-mono font-bold text-slate-900 dark:text-amber-200`}>
                         {s.number}
@@ -538,9 +565,18 @@ export default function ReportsPage() {
       {selected && (
         <section className={`mt-4 ${ui.cardPad}`}>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-bold">
-              รายการโพย — {selected.label} ({bets.length} รายการ)
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold">
+                รายการโพย — {selected.label} ({bets.length} รายการ)
+              </h2>
+              <input
+                type="text"
+                placeholder="🔍 ค้นหาเลข/ชื่อ..."
+                value={searchBets}
+                onChange={(e) => setSearchBets(e.target.value)}
+                className="w-40 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm focus:border-blue-400 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+              />
+            </div>
             <label className="flex items-center gap-2 text-sm text-slate-600">
               <input
                 type="checkbox"
@@ -567,7 +603,13 @@ export default function ReportsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {bets.map((b) => (
+                  {bets
+                    .filter((b) => {
+                      if (!searchBets.trim()) return true;
+                      const q = searchBets.trim();
+                      return b.number.includes(q) || (b.customerName ?? "").includes(q);
+                    })
+                    .map((b) => (
                     <tr
                       key={b.id}
                       className={b.status === "cancelled" ? "opacity-50" : ""}
