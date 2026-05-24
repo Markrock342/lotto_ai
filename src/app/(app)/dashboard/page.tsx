@@ -15,6 +15,7 @@ type DashboardData = {
     fullCount: number;
   };
   top10: { number: string; sets: number; totalAmount: number }[];
+  nearFull: { number: string; sets: number; totalAmount: number }[];
   recentDraws: {
     id: string;
     label: string;
@@ -66,12 +67,38 @@ export default function DashboardPage() {
         ? `ออกผลแล้ว ${draw.result4}`
         : "ปิดงวด";
 
+  function copyLineSummary() {
+    const profit = live.totalReceived - live.totalRisk;
+    const top3 = data!.top10.slice(0, 3).map((r) => `${r.number}(${r.sets}ชุด)`).join(", ");
+    const text = [
+      `🎯 หวยลาว — ${draw.label}`,
+      `━━━━━━━━━━━━━━`,
+      `รับรวม:   ฿${live.totalReceived.toLocaleString()}`,
+      `เสี่ยงคาด:  ฿${live.totalRisk.toLocaleString()}`,
+      `กำไร: ${profit >= 0 ? "+" : ""}฿${profit.toLocaleString()}`,
+      `━━━━━━━━━━━━━━`,
+      `โพย: ${live.totalBets} ชุด / เลข: ${live.uniqueNumbers} เลข`,
+      top3 ? `เลขดัง: ${top3}` : "",
+      draw.result4 ? `ผลออก: ${draw.result4}` : "ยังไม่ออกผล",
+    ].filter(Boolean).join("\n");
+    void navigator.clipboard.writeText(text);
+  }
+
   return (
     <>
       <PageHeader
         title="แดชบอร์ด"
         subtitle={`${data.house.name} · ${draw.label} · ${statusLabel} · ราคา ${data.house.pricePerSet} บาท/ชุด`}
       />
+      <div className="mb-3 flex justify-end">
+        <button
+          type="button"
+          onClick={copyLineSummary}
+          className="flex items-center gap-1.5 rounded-xl border border-green-300 bg-green-50 px-4 py-2 text-sm font-semibold text-green-700 hover:bg-green-100 dark:border-green-700/50 dark:bg-green-950/40 dark:text-green-300"
+        >
+          📋 คัดลอกสรุปยอด LINE
+        </button>
+      </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatBox label="ยอดรับงวดนี้" value={`฿${live.totalReceived.toLocaleString()}`} variant="accent" />
@@ -115,19 +142,36 @@ export default function DashboardPage() {
         )}
       </section>
 
+      {data.nearFull.length > 0 && (
+        <section className={`mt-4 ${ui.cardPad}`}>
+          <h2 className="text-sm font-bold text-amber-700 dark:text-amber-300">⚠️ เลขใกล้เต็ม ({data.nearFull.length} เลข)</h2>
+          <ul className="mt-3 space-y-2">
+            {data.nearFull.map((r) => (
+              <li
+                key={r.number}
+                className="flex items-center justify-between rounded-xl bg-amber-50 px-4 py-2 dark:bg-amber-900/20"
+              >
+                <span className="font-mono font-bold tracking-widest text-amber-800 dark:text-amber-200">{r.number}</span>
+                <span className="text-sm text-amber-700 dark:text-amber-300">{r.sets} ชุด</span>
+                <span className="font-semibold text-amber-800 dark:text-amber-200">฿{r.totalAmount.toLocaleString()}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {data.recentDraws.length > 0 && (
         <section className={`mt-4 ${ui.cardPad}`}>
-          <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200">งวดที่ออกผลแล้ว</h2>
+          <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200">ประวัติผลรางวัล ({data.recentDraws.length} งวด)</h2>
           <ul className="mt-3 space-y-2">
             {data.recentDraws.map((d) => (
               <li
                 key={d.id}
                 className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-800"
               >
-                <span className="font-medium text-slate-700 dark:text-slate-300">{d.label}</span>
-                <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{d.result4}</span>
-                <span className="text-slate-500">รับ ฿{(d.totalReceived ?? 0).toLocaleString()}</span>
-                <span className="text-red-500">จ่าย ฿{(d.totalPayout ?? 0).toLocaleString()}</span>
+                <span className="w-28 font-medium text-slate-700 dark:text-slate-300">{d.label}</span>
+                <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{d.result4 ?? "—"}</span>
+                <span className="text-slate-500">฿{(d.totalReceived ?? 0).toLocaleString()}</span>
                 <span className={d.profit >= 0 ? "font-bold text-emerald-600" : "font-bold text-red-500"}>
                   {d.profit >= 0 ? "+" : ""}฿{d.profit.toLocaleString()}
                 </span>

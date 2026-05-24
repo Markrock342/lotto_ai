@@ -59,8 +59,26 @@ export async function GET() {
   const recentDraws = await prisma.draw.findMany({
     where: { houseId: session.houseId, status: "settled" },
     orderBy: { settledAt: "desc" },
-    take: 5,
+    take: 20,
   });
+
+  // เลขใกล้เต็ม (warning)
+  const nearFull = rows
+    .filter((r) => r.status === "warning")
+    .sort((a, b) => b.totalAmount - a.totalAmount)
+    .slice(0, 10);
+
+  // สรุปชุดแยก 4 ประเภทหลัก
+  const pad4 = (n: string) => n.padStart(4, "0").slice(-4);
+  const prizeGroupMap = { four: 0, three: 0, twoFront: 0, twoBack: 0 };
+  for (const b of bets) {
+    const n = pad4(b.number);
+    prizeGroupMap.four += 1;
+    prizeGroupMap.three += 1;
+    prizeGroupMap.twoFront += 1;
+    prizeGroupMap.twoBack += 1;
+    void n; // ใช้ทุก bet เพิ่ม 1 ชุดต่อประเภท
+  }
 
   const top10 = [...aggregated]
     .sort((a, b) => b.totalAmount - a.totalAmount)
@@ -82,6 +100,13 @@ export async function GET() {
         fullCount,
       },
       top10,
+      nearFull,
+      prizeGroupSummary: {
+        four: bets.length,
+        three: bets.length,
+        twoFront: bets.length,
+        twoBack: bets.length,
+      },
       recentDraws: recentDraws.map((d) => ({
         id: d.id,
         label: d.label,

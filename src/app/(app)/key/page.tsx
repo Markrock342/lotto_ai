@@ -82,6 +82,29 @@ export default function KeyPage() {
     }, 0);
   }, [previewResult]);
 
+  // เช็คว่าเลขไหนใน preview เกิน cap แล้ว
+  const previewBlockedNumbers = useMemo(() => {
+    if (!previewResult || !limitsConfig || !summary) return [];
+    // รวมจำนวนชุดปัจจุบันจาก summary
+    const currentSets = new Map(summary.rows.map((r) => [r.number, r.sets]));
+    const blocked: { number: string; current: number; incoming: number; max: number }[] = [];
+    const seen = new Map<string, number>(); // นับใน preview เอง
+    for (const sec of previewResult.sections) {
+      for (const entry of sec.entries) {
+        seen.set(entry.number, (seen.get(entry.number) ?? 0) + 1);
+      }
+    }
+    for (const [number, incomingSets] of seen.entries()) {
+      const currentSet = currentSets.get(number) ?? 0;
+      const maxSets = limitsConfig.perNumber?.[number]?.maxSets
+        ?? limitsConfig.defaultMaxSets;
+      if (maxSets != null && currentSet + incomingSets > maxSets) {
+        blocked.push({ number, current: currentSet, incoming: incomingSets, max: maxSets });
+      }
+    }
+    return blocked;
+  }, [previewResult, limitsConfig, summary]);
+
   const loadStaticData = useCallback(async () => {
     const settingsRes = await fetch("/api/settings");
     if (settingsRes.ok) {
@@ -135,6 +158,14 @@ export default function KeyPage() {
   }, []);
 
   async function handleImport() {
+    // แจ้งเตือนถ้ามีเลขเกิน cap
+    if (previewBlockedNumbers.length > 0) {
+      const list = previewBlockedNumbers
+        .map((b) => `${b.number} (มี ${b.current} + เพิ่ม ${b.incoming} = ${b.current + b.incoming} ชุด เกิน cap ${b.max})`)
+        .join("\n");
+      const ok = confirm(`⚠️ เลขเกิน Cap ${previewBlockedNumbers.length} รายการ:\n\n${list}\n\nบันทึกต่อไหม? (เลขที่เกินจะถูกตัดออกอัตโนมัติ)`);
+      if (!ok) return;
+    }
     setLoading(true);
     setMessage("");
     setBlockedList([]);
@@ -465,7 +496,11 @@ export default function KeyPage() {
           className={`${ui.input} mt-2 min-h-[200px] resize-y font-mono disabled:opacity-50`}
         />
         {previewResult && previewTotal > 0 && (
-          <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-200">
+          <div className={`mt-4 rounded-xl border px-4 py-3 ${
+            previewBlockedNumbers.length > 0
+              ? "border-red-300 bg-red-50 text-red-900 dark:border-red-700/50 dark:bg-red-950/40 dark:text-red-200"
+              : "border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-200"
+          }`}>
             <div className="flex items-center justify-between font-bold">
               <span>ยอดรวมที่จะบันทึก:</span>
               <span className="text-xl text-blue-700 dark:text-amber-300">฿{previewTotal.toLocaleString()}</span>
@@ -474,6 +509,18 @@ export default function KeyPage() {
               <span>จำนวน: {previewResult.sections.reduce((c, s) => c + s.entries.length, 0)} ชุด</span>
               {previewResult.sections.length > 1 && <span>แยกเป็น {previewResult.sections.length} บิล</span>}
             </div>
+            {previewBlockedNumbers.length > 0 && (
+              <div className="mt-2 border-t border-red-200 pt-2 dark:border-red-700/50">
+                <p className="text-xs font-bold text-red-600 dark:text-red-300">⚠️ เลขเกิน Cap {previewBlockedNumbers.length} รายการ — จะถูกตัดออก:</p>
+                <ul className="mt-1 space-y-0.5">
+                  {previewBlockedNumbers.map((b) => (
+                    <li key={b.number} className="font-mono text-xs text-red-700 dark:text-red-300">
+                      {b.number}: มี {b.current} + เพิ่ม {b.incoming} = {b.current + b.incoming} ชุด (cap: {b.max})
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         )}
         <div className="mt-4 flex flex-wrap gap-2">
