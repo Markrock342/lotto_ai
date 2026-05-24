@@ -46,14 +46,14 @@ export default function ResultsPage() {
       const res = await fetch("/api/results", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fourDigit }),
+        body: JSON.stringify({ fourDigit, drawId: data?.draw?.id }),
       });
       const json = await res.json();
       if (!res.ok) {
         setMessage(json.error || "ไม่สำเร็จ");
         return;
       }
-      setMessage("ออกผลและคำนวณเรียบร้อย");
+      setMessage(data?.draw?.status === "settled" ? "แก้ไขผลและคำนวณใหม่เรียบร้อย" : "ออกผลและคำนวณเรียบร้อย");
       setData({ draw: json.draw, hasResult: true, settlement: json.settlement });
     } finally {
       setLoading(false);
@@ -107,9 +107,13 @@ export default function ResultsPage() {
               type="button"
               onClick={handleSettle}
               disabled={loading || fourDigit.length !== 4}
-              className={`${ui.btnSuccess} flex-1`}
+              className={`${data?.draw?.status === "settled" ? ui.btnPrimary : ui.btnSuccess} flex-1`}
             >
-              {loading ? "กำลังคำนวณ..." : "บันทึกผล + ตรวจรางวัล"}
+              {loading
+                ? "กำลังคำนวณ..."
+                : data?.draw?.status === "settled"
+                  ? "แก้ไขผลรางวัล (คำนวณใหม่)"
+                  : "บันทึกผล + ตรวจรางวัล"}
             </button>
           )}
         </div>

@@ -68,7 +68,7 @@ export async function POST(request: Request) {
   if (auth.error) return auth.error;
   const session = auth.session;
 
-  const body = (await request.json()) as { fourDigit?: string };
+  const body = (await request.json()) as { fourDigit?: string; drawId?: string };
   const raw = body.fourDigit?.replace(/\D/g, "") ?? "";
   if (raw.length !== 4) {
     return NextResponse.json(
@@ -78,9 +78,18 @@ export async function POST(request: Request) {
   }
 
   const fourDigit = raw.padStart(4, "0");
-  const draw = await getActiveOpenDraw(session.houseId);
+  
+  let draw;
+  if (body.drawId) {
+    draw = await prisma.draw.findFirst({
+      where: { id: body.drawId, houseId: session.houseId },
+    });
+  } else {
+    draw = await getActiveOpenDraw(session.houseId);
+  }
+
   if (!draw) {
-    return NextResponse.json({ error: "ไม่มีงวดที่เปิดรับอยู่" }, { status: 400 });
+    return NextResponse.json({ error: "ไม่พบงวดที่จะออกผล" }, { status: 400 });
   }
 
   const betCount = await prisma.bet.count({
@@ -105,17 +114,25 @@ export async function POST(request: Request) {
     data: {
       result4: fourDigit,
       status: "settled",
-      settledAt: new Date(),
+      settledAt: draw.status === "settled" ? draw.settledAt : new Date(),
       totalReceived: settlement.totalReceived,
       totalPayout: settlement.totalPayout,
     },
   });
 
-  await getOrCreateOpenDraw(session.houseId);
+  if (draw.status === "open") {
+    await getOrCreateOpenDraw(session.houseId);
+  }
 
   return NextResponse.json({
     ok: true,
-    draw: { id: draw.id, label: draw.label, result4: fourDigit },
+    draw: {
+      id: draw.id,
+      label: draw.label,
+      result4: fourDigit,
+      status: "settled",
+      settledAt: draw.status === "settled" ? draw.settledAt : new Date(),
+    },
     settlement,
   });
 }
