@@ -107,9 +107,6 @@ export default function UsersPage() {
         </ul>
       </div>
 
-      <h2 className="mb-2 text-sm font-bold text-slate-800 dark:text-slate-200">ตารางสิทธิ์</h2>
-      <PermissionMatrix />
-
       <ul className="mt-6 space-y-2">
         {users.map((u) => (
           <li
@@ -225,6 +222,11 @@ export default function UsersPage() {
           </button>
         </form>
       )}
+
+      <div className={`mt-8 ${ui.cardPad}`}>
+        <h2 className="mb-4 text-sm font-bold text-slate-800 dark:text-slate-200">ตารางสิทธิ์การใช้งาน</h2>
+        <PermissionMatrix />
+      </div>
     </>
   );
 }
