@@ -139,62 +139,33 @@ export default function ReportsPage() {
   /** สรุปยอดทุกประเภทรางวัลพร้อมกัน */
   const prizeCategorySummary = useMemo(() => {
     const activeBets = bets.filter((b) => b.status !== "cancelled");
+    const pad4 = (n: string) => n.replace(/\D/g, "").padStart(4, "0").slice(-4);
 
-    // We will separate the bets based on their original length first,
-    // or assign them to the correct category they were bought for.
-    // 2-digit numbers are 2ตัวหลัง (twoBack).
-    // 3-digit numbers are 3ตัวตรง (threeStraight).
-    // 4-digit numbers can be mapped to categories based on their slices,
-    // OR we only put them in the categories where they are naturally matched:
-    // - fourStraight: matches activeBets with length 4
-    // - threeStraight: matches activeBets with length >= 3 (for 4-digit, slice(-3))
-    // - twoFront: matches activeBets with length 4 (slice(0, 2))
-    // - twoBack: matches activeBets with length >= 2 (for 4-digit slice(-2), for 3-digit slice(-2), for 2-digit itself)
-    // Let's implement this mapping:
-    const categories = [
-      {
-        key: "fourStraight",
-        label: "4 ตัวตรง",
-        filter: (b: BetRow) => b.number.length === 4,
-        extract: (n: string) => n,
-      },
-      {
-        key: "threeStraight",
-        label: "3 ตัวตรง",
-        filter: (b: BetRow) => b.number.length === 3 || b.number.length === 4,
-        extract: (n: string) => n.slice(-3),
-      },
-      {
-        key: "twoFront",
-        label: "2 ตัวหน้า",
-        filter: (b: BetRow) => b.number.length === 4,
-        extract: (n: string) => n.slice(0, 2),
-      },
-      {
-        key: "twoBack",
-        label: "2 ตัวหลัง",
-        filter: (b: BetRow) => b.number.length >= 2,
-        extract: (n: string) => n.slice(-2),
-      },
+    // ประเภทที่ต้องการแสดง: key => { label, extractor(num4) }
+    const categories: { key: string; label: string; extract: (n: string) => string }[] = [
+      { key: "fourStraight", label: "4 ตัวตรง", extract: (n) => n },
+      { key: "threeStraight", label: "3 ตัวตรง", extract: (n) => n.slice(-3) },
+      { key: "twoFront", label: "2 ตัวหน้า", extract: (n) => n.slice(0, 2) },
+      { key: "twoBack", label: "2 ตัวหลัง", extract: (n) => n.slice(-2) },
     ];
 
-    return categories.map(({ key, label, filter, extract }) => {
+    return categories.map(({ key, label, extract }) => {
+      // นับชุดแยกตามเลข
       const map = new Map<string, { sets: number; amount: number }>();
-      let totalSets = 0;
       for (const b of activeBets) {
-        if (!filter(b)) continue;
-        const digit = extract(b.number);
+        const num4 = pad4(b.number);
+        const digit = extract(num4);
         const existing = map.get(digit) ?? { sets: 0, amount: 0 };
         existing.sets += 1;
         existing.amount += b.amount;
         map.set(digit, existing);
-        totalSets += 1;
       }
       const rows = Array.from(map.entries())
         .map(([number, data]) => ({ number, ...data }))
         .sort((a, b) => b.sets - a.sets);
+      const totalSets = rows.reduce((s, r) => s + r.sets, 0);
       const uniqueNumbers = rows.length;
-      return { key, label, rows, totalSets, uniqueNumbers };
+      return { key, label, extract, rows, totalSets, uniqueNumbers };
     });
   }, [bets]);
 
